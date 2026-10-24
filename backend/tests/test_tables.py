@@ -41,7 +41,7 @@ async def test_get_tables_and_qr_graphic(client: AsyncClient, manager_a_token: s
     first_table = tables[0]
     table_id = first_table["id"]
 
-    # 2. Fetch QR graphic for the table
+    # 2. Fetch QR graphic for the table (with LAN IP)
     qr_res = await client.get(
         f"/api/v1/tables/{table_id}/qr",
         headers={
@@ -56,6 +56,19 @@ async def test_get_tables_and_qr_graphic(client: AsyncClient, manager_a_token: s
     assert qr_data["diner_url"].startswith("http://192.168.18.95:3001")
     assert "<svg" in qr_data["svg_data"]
     assert qr_data["png_data_url"].startswith("data:image/png;base64,")
+
+    # 3. Fetch QR graphic with localhost origin (should automatically map to LAN IP so phones can scan)
+    qr_local_res = await client.get(
+        f"/api/v1/tables/{table_id}/qr",
+        headers={
+            "Authorization": f"Bearer {manager_a_token}",
+            "Origin": "http://localhost:3001",
+        },
+    )
+    assert qr_local_res.status_code == 200
+    local_data = qr_local_res.json()
+    assert not local_data["diner_url"].startswith("http://localhost")
+    assert ":3001/r/" in local_data["diner_url"]
 
 
 @pytest.mark.asyncio

@@ -25,6 +25,22 @@ from app.services.audit import record_audit_log
 router = APIRouter()
 
 
+def resolve_lan_ip() -> str:
+    """
+    Determines local network IP address so physical mobile devices
+    scanning tabletop QR codes can reach the frontend server on the same Wi-Fi.
+    """
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
 # -----------------------------------------------------------------------------
 # Public Diner Endpoint (Zero-Install Access)
 # -----------------------------------------------------------------------------
@@ -197,14 +213,26 @@ async def get_table_qr_graphic(
 
     table, restaurant = row
 
-    # Determine base frontend URL from request origin/referer or host
+    # Determine base frontend URL from request origin/referer or host.
+    # When scanned from a physical mobile camera, 'localhost' points to the phone itself,
+    # causing 'This site can't be reached'. Replace loopback hosts with the LAN IP.
+    lan_ip = resolve_lan_ip()
     origin = request.headers.get("origin") or request.headers.get("referer")
     if origin:
         from urllib.parse import urlparse
         parsed = urlparse(origin)
-        base_url = f"{parsed.scheme}://{parsed.netloc}"
+        scheme = parsed.scheme or "http"
+        hostname = parsed.hostname or "localhost"
+        port_str = f":{parsed.port}" if parsed.port else ""
+        if hostname in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
+            hostname = lan_ip
+            if not port_str:
+                port_str = ":3001"
+        base_url = f"{scheme}://{hostname}{port_str}"
     else:
         req_host = request.headers.get("host", "").split(":")[0] or "localhost"
+        if req_host in ("localhost", "127.0.0.1", "0.0.0.0", "::1"):
+            req_host = lan_ip
         base_url = f"http://{req_host}:3001"
 
     return build_table_qr_response(table, restaurant, base_url=base_url)

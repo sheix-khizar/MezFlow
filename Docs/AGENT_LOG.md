@@ -434,6 +434,18 @@ This document serves as the authoritative, persistent operational log of all int
   - **Generated Missing PWA Assets:** Created branded MezFlow icons `frontend/public/icon-192.png`, `frontend/public/icon-512.png`, and `frontend/public/favicon.ico`. 404 manifest errors eliminated.
   - **Verification:** Verified `POST /auth/login` and root health endpoints return 200 OK without delay. TypeScript compilation verified with 0 errors.
 
+### 3.14. Session 14 — 2026-10-24: Resolution of Mobile QR Code Scan Failure ("The site can't be reached")
+- **User Prompt:** "Now, QR code did not work by scaning from obile.. Its say The site can't reached."
+- **Root Cause Analysis:**
+  1. **QR Code URL Encoded `localhost`:** When manager opened `http://localhost:3001/admin/tables`, the backend QR endpoint (`/tables/{id}/qr`) took `request.headers.get("origin")` (`http://localhost:3001`), encoding `http://localhost:3001/r/demo-bistro/t/{token}` into the QR code graphic. When a mobile phone scanned it, the phone tried to connect to `localhost:3001` on the phone itself, failing immediately with `ERR_CONNECTION_REFUSED`.
+  2. **Backend Bound to `127.0.0.1` Instead of `0.0.0.0`:** Uvicorn had been started without `--host 0.0.0.0`, listening exclusively on `127.0.0.1:8000`. Even when mobile navigated to the server machine over Wi-Fi, API calls to `http://192.168.18.95:8000` were rejected (`WinError 10061`).
+- **Actions Taken:**
+  - **Automatic LAN IP Resolution for QR Codes:** Added `resolve_lan_ip()` to [`backend/app/api/v1/endpoints/tables.py`](file:///c:/Users/dell/Desktop/Khizar/Mezflow/MezFlow/backend/app/api/v1/endpoints/tables.py). If `origin` or `host` specifies a loopback address (`localhost`, `127.0.0.1`, `0.0.0.0`, `::1`), the endpoint automatically substitutes the server's local Wi-Fi IP (`192.168.18.95`), keeping port `:3001`.
+  - **Verified End-to-End QR Output:** Tested Table 4 QR graphic generation with `Origin: http://localhost:3001`; verified `diner_url` generates `http://192.168.18.95:3001/r/demo-bistro/t/t4_212b7a3edb77eea9` and encodes this into the QR image.
+  - **Updated Pytest Suite:** Added test in [`backend/tests/test_tables.py`](file:///c:/Users/dell/Desktop/Khizar/Mezflow/MezFlow/backend/tests/test_tables.py) asserting that `Origin: http://localhost:3001` maps to the LAN IP and not `localhost`. Tests pass 100%.
+  - **Restarted Backend Daemon on `0.0.0.0:8000`:** Stopped the `127.0.0.1`-bound process and launched [`backend/run.py`](file:///c:/Users/dell/Desktop/Khizar/Mezflow/MezFlow/backend/run.py) listening on `0.0.0.0:8000` (`TCP 0.0.0.0:8000 LISTENING 8132`). Confirmed LAN connectivity via `http://192.168.18.95:8000/api/v1/health` (HTTP 200).
+  - **Verified Next.js Route Compilation:** Verified `http://192.168.18.95:3001/r/demo-bistro/t/t4_212b7a3edb77eea9` compiles cleanly and returns HTTP 200 OK.
+
 ---
 
 ## 4. Current Repository State Summary
@@ -453,8 +465,8 @@ This document serves as the authoritative, persistent operational log of all int
   - Seeded demo restaurant *"MezFlow Bistro"* (`52dc0556-c8c6-4131-be96-6643f9cc35b0`), 10 tables with cryptographic QR tokens, bilingual categories, dishes with structured AI attributes, modifier groups, and test staff accounts.
   - Active Orders & Carts: Clean (0 old orders, ready for real mobile order dispatch).
 * **Server Status:**
-  - FastAPI Backend active on port `8000` (`http://0.0.0.0:8000`).
-  - Next.js Frontend active on port `3001` (`http://0.0.0.0:3001`).
+  - FastAPI Backend active on port `8000` (`http://0.0.0.0:8000`, PID 8132).
+  - Next.js Frontend active on port `3001` (`http://0.0.0.0:3001`, PID 17152).
 * **CI/CD Pipeline Status:** **PASSING (Green ✅)** on GitHub Actions (`backend-test` & `frontend-check`).
 * **Test Suite Status:** 40/40 tests passing (100%).
 
@@ -468,6 +480,8 @@ This document serves as the authoritative, persistent operational log of all int
 4. [x] Resolve port 8000 Docker collision and add KDS direct auto-auth.
 5. [x] Fix GitHub Actions CI test database seeding so CI pipeline builds green.
 6. [x] Resolve login timeout, map localhost to 127.0.0.1, and generate PWA manifest icons.
-7. [ ] Initiate planning for **Module 5: Order Lifecycle & Real-Time Sync** (FYP-II milestone or edge reconnection & reconciliation).
+7. [x] Resolve mobile QR scan "The site can't be reached" error via auto LAN IP mapping and 0.0.0.0 backend listener.
+8. [ ] Initiate planning for **Module 5: Order Lifecycle & Real-Time Sync** (FYP-II milestone or edge reconnection & reconciliation).
+
 
 
