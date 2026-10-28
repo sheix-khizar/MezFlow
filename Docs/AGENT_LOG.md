@@ -481,7 +481,16 @@ This document serves as the authoritative, persistent operational log of all int
 5. [x] Fix GitHub Actions CI test database seeding so CI pipeline builds green.
 6. [x] Resolve login timeout, map localhost to 127.0.0.1, and generate PWA manifest icons.
 7. [x] Resolve mobile QR scan "The site can't be reached" error via auto LAN IP mapping and 0.0.0.0 backend listener.
-8. [ ] Initiate planning for **Module 5: Order Lifecycle & Real-Time Sync** (FYP-II milestone or edge reconnection & reconciliation).
+8. [x] Investigate and verify Vercel deployment architecture; confirm backend endpoints live on Vercel and fix frontend client baseURL resolution.
+9. [ ] Initiate planning for **Module 5: Order Lifecycle & Real-Time Sync** (FYP-II milestone or edge reconnection & reconciliation).
 
-
-
+### 3.15. Session 15 — 2026-10-29: Vercel Deployment Verification & Client Production API Route Resolution
+- **User Prompt:** "https://mezflow.vercel.app/ Now we deploy project on vercel, what next? ... I caanot know where my backend is running is this locally or on vercel by making vercel.json file. plz chek it out just."
+- **Investigation & Findings:**
+  1. **Backend REST API is Deployed & Running on Vercel:** Verified all 40 FastAPI endpoints on `https://mezflow.vercel.app/api/v1` respond with HTTP 200 OK (`/health`, `/auth/login`, `/tables`, `/restaurants/{id}/menu`). Database connectivity is active (`database: connected`) and Farooq (Manager) login succeeded over the public Vercel domain.
+  2. **Root Cause of Frontend Login Failure on Vercel:** `frontend/src/lib/api.ts` contained an interceptor that unconditionally set `config.baseURL = 'http://${host}:8000/api/v1'`. When visited via `https://mezflow.vercel.app`, the browser attempted to connect to port 8000 on Vercel (`http://mezflow.vercel.app:8000`), which does not exist, causing a 10-second timeout.
+  3. **WebSocket Limitations on Serverless:** Vercel serverless executes HTTP REST API requests but terminates persistent WebSocket connections (`wss://mezflow.vercel.app/ws/kds/...` returns 404).
+- **Actions Taken:**
+  - **Dynamic BaseURL in `api.ts`:** Updated `frontend/src/lib/api.ts` so that on production Vercel / HTTPS domains it routes requests directly to `/api/v1` on the same origin (no `:8000`), while maintaining local `localhost:8000` / Wi-Fi LAN IP fallback for local testing.
+  - **Environment-Aware WebSocket Hooks:** Updated `useKDSSocket.ts`, `useMenuRealtime.ts`, and `useTableSession.ts` to prioritize `process.env.NEXT_PUBLIC_WS_URL`.
+  - **Verified Production Build:** Executed `npm run build` with 8/8 routes compiling cleanly and zero TypeScript errors.

@@ -16,12 +16,23 @@ export const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== "undefined") {
-      // Automatically target backend on the same host (supports mobile Wi-Fi testing)
-      const host =
-        window.location.hostname === "localhost"
-          ? "127.0.0.1"
-          : window.location.hostname;
-      config.baseURL = `http://${host}:8000/api/v1`;
+      // 1. Explicit environment variable if configured
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        config.baseURL = process.env.NEXT_PUBLIC_API_URL;
+      } else if (
+        window.location.hostname.endsWith(".vercel.app") ||
+        window.location.protocol === "https:"
+      ) {
+        // 2. Production Vercel deployment: Backend is hosted at /api/v1 on the same origin
+        config.baseURL = "/api/v1";
+      } else {
+        // 3. Localhost and Wi-Fi LAN IP testing
+        const host =
+          window.location.hostname === "localhost"
+            ? "127.0.0.1"
+            : window.location.hostname;
+        config.baseURL = `http://${host}:8000/api/v1`;
+      }
 
       const token = localStorage.getItem("mezflow_token");
       if (token && config.headers) {

@@ -33,7 +33,8 @@ export function useMenuRealtime(
         ? "127.0.0.1"
         : window.location.hostname;
     const defaultHost = `${host}:8000`;
-    const wsBase = `${isHttps ? "wss" : "ws"}://${defaultHost}`;
+    const wsBase =
+      process.env.NEXT_PUBLIC_WS_URL || `${isHttps ? "wss" : "ws"}://${defaultHost}`;
     const wsUrl = `${wsBase}/ws/restaurants/${restaurantId}/menu`;
 
     try {
