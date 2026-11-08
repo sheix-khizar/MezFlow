@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   QrCode,
@@ -35,10 +35,15 @@ import {
 } from "lucide-react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useAuthStore } from "@/lib/authStore";
+import { warmupBackend } from "@/lib/api";
 
 export default function HomePage() {
   const { language } = useAuthStore();
   const isUrdu = language === "ur";
+
+  useEffect(() => {
+    warmupBackend();
+  }, []);
 
   // Interactive Pillar Tab State in Section 2
   const [activePillarTab, setActivePillarTab] = useState<"guest" | "kds" | "admin">("guest");

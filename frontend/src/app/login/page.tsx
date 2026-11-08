@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useAuthStore } from "@/lib/authStore";
-import apiClient from "@/lib/api";
+import apiClient, { warmupBackend } from "@/lib/api";
 
 // Demo Restaurant ID from database seed
 const DEMO_RESTAURANT_ID = "52dc0556-c8c6-4131-be96-6643f9cc35b0";
@@ -28,6 +28,10 @@ const DEMO_RESTAURANT_ID = "52dc0556-c8c6-4131-be96-6643f9cc35b0";
 export default function LoginPage() {
   const router = useRouter();
   const { setAuth, language } = useAuthStore();
+
+  useEffect(() => {
+    warmupBackend();
+  }, []);
 
   const [authMode, setAuthMode] = useState<"password" | "otp">("password");
   const [email, setEmail] = useState("");

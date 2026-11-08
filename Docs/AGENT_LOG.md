@@ -557,3 +557,20 @@ This document serves as the authoritative, persistent operational log of all int
   - **Created `frontend/vercel.json`:** Configured Next.js framework schema to support direct subfolder builds if Root Directory is configured to `frontend`.
   - **Verified Next.js Production Build:** Executed `cd frontend && npm run build` locally; all 8 routes compiled cleanly with 0 errors.
   - **Git Operations:** Committed `vercel.json` and `frontend/vercel.json` and pushed to `origin/main`.
+
+### 3.18. Session 18 — 2026-11-08: Cold-Start Timeout Mitigation & Cross-Domain Production Routing
+- **User Prompt:** "https://mez-flow.vercel.app/ Now I deploy backend on this new my own vercel account, and backend running on old my member's account, But this 1000 limit error show on first on second try they succesful, just fix this issues carefully and updated github. as well."
+- **Investigation & Findings:**
+  1. **New Production Deployment Live:** Confirmed `https://mez-flow.vercel.app/` successfully deployed with the new 5-section commercial SaaS platform.
+  2. **Root Cause of "10000ms limit exceeded" on First Attempt:**
+     - The FastAPI backend running on Vercel (`https://mezflow.vercel.app/api/v1`) goes to sleep when idle.
+     - On the first incoming request after inactivity, the serverless container undergoes a cold start (FastAPI boot + SQLAlchemy engine + remote PostgreSQL connection pool), taking ~11-12 seconds.
+     - Axios in `frontend/src/lib/api.ts` was hardcoded to a 10,000ms (10s) timeout limit, aborting at 10.0s before the cold boot finished. On the second attempt, the container was already warm, completing in 200ms.
+  3. **Multi-Domain Routing:** The user's new frontend domain is `mez-flow.vercel.app`, while the backend serverless endpoints are hosted on `mezflow.vercel.app`.
+- **Actions Taken:**
+  - **Increased Axios Timeout:** Increased client timeout from 10,000ms to 45,000ms (`45s`) in `frontend/src/lib/api.ts` to easily accommodate serverless cold starts without aborting.
+  - **Intelligent Auto-Retry on Timeout:** Configured Axios response interceptor to automatically retry once in the background on `ECONNABORTED`, timeout, or initial connection drop. This seamlessly recovers from cold boots without surfacing errors to the user.
+  - **Automated Background Warmup (`warmupBackend`):** Added a non-blocking background ping (`/health`) that fires on mount in both `app/page.tsx` and `app/login/page.tsx`. When a visitor lands on the site, the backend is pre-warmed before credentials are submitted.
+  - **Cross-Origin & Reverse Proxy Configuration:** Configured Next.js rewrites in `frontend/next.config.mjs` forwarding `/api/v1/:path*` to `https://mezflow.vercel.app/api/v1/:path*`, with fallback `config.baseURL = "https://mezflow.vercel.app/api/v1"` in `api.ts`.
+  - **Verification:** Verified `npm run build` succeeds with 0 errors across all 8 routes.
+  - **Git Operations:** Committed and pushed changes to GitHub `origin/main` to trigger automatic Vercel redeployment.
