@@ -544,3 +544,16 @@ This document serves as the authoritative, persistent operational log of all int
      - Executed full `next build` with zero TypeScript errors across all 8 routes.
      - Backend active on port `8000` (`http://127.0.0.1:8000/api/v1/health` returning HTTP 200).
      - Frontend dev server running on port `3001` (`http://localhost:3001` with all pages returning HTTP 200).
+
+
+### 3.17. Session 17 — 2026-11-08: Vercel Production Deployment Resolution & Monorepo Configuration
+- **User Prompt:** "Why not updated all? I want to record video on live link not on local host, So please update it." [Attached screenshot showing mezflow.vercel.app displaying legacy UI].
+- **Investigation & Findings:**
+  1. **GitHub is Fully Up to Date:** Commit `9b7b35a` (SaaS overhaul) and `3bcb2e4` were successfully pushed to `origin/main`. GitHub Actions CI pipeline passed green (`conclusion: success`, Run ID `42477997983`).
+  2. **Vercel Serving Stale Cached Deployment:** Live HTTP headers from `https://mezflow.vercel.app/` revealed `Age: 1276994` (~14.7 days old) with `X-Vercel-Cache: HIT`. No new build had been deployed since October 24.
+  3. **Root Cause Identified:** The repository is structured as a monorepo with the Next.js application residing in `frontend/`. In the root directory, there was no `package.json` or `vercel.json`. When Vercel builds without the Root Directory configured to `frontend`, it fails to find the build scripts, and Vercel safely continues serving the previous successful deployment.
+- **Actions Taken:**
+  - **Created Root `vercel.json`:** Added automated monorepo build instructions pointing `buildCommand` to `cd frontend && npm run build`, `installCommand` to `cd frontend && npm install`, and `outputDirectory` to `frontend/.next`.
+  - **Created `frontend/vercel.json`:** Configured Next.js framework schema to support direct subfolder builds if Root Directory is configured to `frontend`.
+  - **Verified Next.js Production Build:** Executed `cd frontend && npm run build` locally; all 8 routes compiled cleanly with 0 errors.
+  - **Git Operations:** Committed `vercel.json` and `frontend/vercel.json` and pushed to `origin/main`.
