@@ -585,3 +585,14 @@ This document serves as the authoritative, persistent operational log of all int
   - **Deterministic Table Sequencing:** Replaced modulo table numbering in `test_collaborative_cart.py` and `test_kds.py` with `select(func.coalesce(func.max(Table.table_number), 1000)) + 1`. This mathematically guarantees 0% collision probability across concurrent test fixtures.
   - **Local Test Suite Verification:** Ran `pytest` locally; verified 16/16 tests pass in 24.83 seconds.
   - **Git Operations:** Committed and pushed changes to GitHub `origin/main` to turn the GitHub commit status green.
+
+### 3.20. Session 20 — 2026-11-08: Video Walkthrough Script Formulation & Screen Recording Guide
+- **User Prompt:** "Now ready script content for walkthrough video. How to explain and what I talk."
+- **Actions Taken:**
+  - **Authored Comprehensive Walkthrough Script:** Created dedicated artifact `MezFlow_Video_Walkthrough_Script.md` detailing a 6-scene structured demonstration (00:00 to 06:30) with exact on-screen actions, browser URLs, visual cues, and verbatim spoken narration.
+  - **Covered All 5 Core Product Capabilities:**
+    1. Modern SaaS Landing Page (`https://mez-flow.vercel.app/`) with metric ticker and bilingual toggle.
+    2. Zero-install Guest Dining Experience (`/r/[id]/t/4`) with rich food photography, structured modifier selection, and real-time collaborative group cart.
+    3. Hardware-free Kitchen Display System (`/kds`) with station filtering (Grill/Beverage) and order bump operations.
+    4. Manager Operations Command Center (`/admin`) with live floor occupancy visualizer and physical cryptographic QR stand generation (`/admin/tables`).
+    5. Technical architecture overview highlighting server-authoritative pricing, decoupled dual state machines, and multi-tenant isolation.
