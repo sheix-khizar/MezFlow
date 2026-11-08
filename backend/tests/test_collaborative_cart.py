@@ -24,8 +24,14 @@ async def staff_token(client: AsyncClient) -> str:
 @pytest.fixture
 async def table_with_token() -> str:
     token = f"t_test_{uuid.uuid4().hex[:12]}"
-    table_num = int(uuid.uuid4().int % 9000 + 1000)
     async with TestSessionLocal() as session:
+        from sqlalchemy import func
+        max_res = await session.execute(
+            select(func.coalesce(func.max(Table.table_number), 1000)).where(
+                Table.restaurant_id == DEMO_RESTAURANT_A_ID
+            )
+        )
+        table_num = int(max_res.scalar() or 1000) + 1
         table = Table(
             restaurant_id=DEMO_RESTAURANT_A_ID,
             table_number=table_num,

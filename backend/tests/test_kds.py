@@ -46,7 +46,13 @@ async def customer_token(client: AsyncClient) -> str:
 async def seeded_test_order() -> Order:
     """Creates a seeded order in DB with Grill and Beverage items."""
     async with TestSessionLocal() as session:
-        table_num = int(uuid.uuid4().int % 9000 + 1000)
+        from sqlalchemy import func
+        max_res = await session.execute(
+            select(func.coalesce(func.max(Table.table_number), 1000)).where(
+                Table.restaurant_id == DEMO_RESTAURANT_A_ID
+            )
+        )
+        table_num = int(max_res.scalar() or 1000) + 1
         table = Table(
             restaurant_id=DEMO_RESTAURANT_A_ID,
             table_number=table_num,
