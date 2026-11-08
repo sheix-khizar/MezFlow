@@ -596,3 +596,15 @@ This document serves as the authoritative, persistent operational log of all int
     3. Hardware-free Kitchen Display System (`/kds`) with station filtering (Grill/Beverage) and order bump operations.
     4. Manager Operations Command Center (`/admin`) with live floor occupancy visualizer and physical cryptographic QR stand generation (`/admin/tables`).
     5. Technical architecture overview highlighting server-authoritative pricing, decoupled dual state machines, and multi-tenant isolation.
+
+### 3.21. Session 21 — 2026-11-08: Urdu & Roman Urdu Walkthrough Video Script Formulation
+- **User Prompt:** "Could you ready in urdu?"
+- **Actions Taken:**
+  - **Authored Bilingual Urdu Script Artifact:** Created `MezFlow_Video_Walkthrough_Script_Urdu.md` providing a fluent, professional spoken walkthrough in Roman Urdu alongside Urdu script, specifically tailored for Pakistani tech evaluations (e.g. FYP presentation).
+  - **Structured 6-Scene Chronological Narration:**
+    1. Introduction to MezFlow SaaS vision & landing page metrics.
+    2. The 3 product pillars (Guest PWA, KDS, Admin Console) & native bilingual toggle.
+    3. Live guest ordering flow (modifiers, group shared cart, server-authoritative pricing).
+    4. Kitchen KDS ticket dispatch, station filtering (Grill/Karahi/Beverage), and bump operations.
+    5. Manager command center, live floor occupancy visualizer, and cryptographic QR stand security.
+    6. System architecture overview (Next.js 14, FastAPI, PostgreSQL, Redis Pub/Sub, decoupled state machines).
