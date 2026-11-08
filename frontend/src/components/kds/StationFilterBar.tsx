@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   Flame,
   Utensils,
@@ -11,6 +12,7 @@ import {
   Wifi,
   WifiOff,
   ChefHat,
+  ArrowLeft,
 } from "lucide-react";
 import { KitchenStation, KDSStatusFilter, KDSSummary } from "@/types/kds";
 
@@ -46,8 +48,15 @@ export function StationFilterBar({
   return (
     <div className="bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-30 shadow-lg">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        {/* Left: Station Pills */}
+        {/* Left: Return & Station Pills */}
         <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
+          <Link
+            href="/admin"
+            className="min-h-[46px] px-3 rounded-xl bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700/80 border border-slate-700/60 flex items-center justify-center shrink-0 transition-colors"
+            title="Return to Operations Portal"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
           {STATIONS.map((station) => {
             const Icon = station.icon;
             const isSelected = selectedStation === station.id;
@@ -135,10 +144,10 @@ export function StationFilterBar({
             )}
           </button>
 
-          {/* WebSocket Live Indicator */}
+          {/* Live Kitchen Status Indicator */}
           <div
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
-            title={isConnected ? "KDS Live WebSocket Active" : "Reconnecting..."}
+            title={isConnected ? "Kitchen Live Sync Active" : "Reconnecting..."}
           >
             {isConnected ? (
               <>

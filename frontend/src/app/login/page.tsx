@@ -192,15 +192,15 @@ export default function LoginPage() {
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 text-brand-400 text-xs font-semibold mb-3 border border-brand-500/20">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Module 1 • Identity & Access Control</span>
+              <span>Staff & Operations Portal</span>
             </div>
             <h1 className="text-2xl font-bold text-white mb-2">
               {language === "ur" ? "سسٹم میں لاگ ان کریں" : "Sign In to MezFlow"}
             </h1>
             <p className="text-xs text-slate-400">
               {language === "ur"
-                ? "عملہ پاس ورڈ سے لاگ ان کرے یا گاہک او ٹی پی استعمال کریں۔"
-                : "Staff password login or diner one-time password verification."}
+                ? "انتظامیہ اور کچن عملے کے لیے محفوظ لاگ ان"
+                : "Secure role-based portal for restaurant managers and kitchen staff."}
             </p>
           </div>
 
@@ -390,33 +390,37 @@ export default function LoginPage() {
             </div>
           )}
 
-          {/* Quick Demo Credentials Preset Bar */}
+          {/* Quick Role Switcher Bar */}
           <div className="mt-8 pt-6 border-t border-white/5">
-            <span className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2 text-center">
-              Quick Test Credentials (M1 Seeded Accounts)
+            <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">
+              Quick Role Switcher
             </span>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <button
                 type="button"
                 onClick={() => fillPreset("manager@mezflow.com", "manager123")}
-                className="p-2 rounded-lg bg-surface-card border border-surface-border hover:border-brand-500/40 text-left transition-colors flex items-center gap-2"
+                className="p-2.5 rounded-xl bg-surface-card border border-surface-border hover:border-purple-500/50 text-left transition-all flex items-center gap-2.5 group"
               >
-                <LayoutDashboard className="w-3.5 h-3.5 text-purple-400" />
+                <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
+                  <LayoutDashboard className="w-4 h-4" />
+                </div>
                 <div>
                   <div className="font-semibold text-white">Manager</div>
-                  <div className="text-[10px] text-slate-400">admin access</div>
+                  <div className="text-[10px] text-slate-400">Admin Console</div>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() => fillPreset("kitchen@mezflow.com", "kitchen123")}
-                className="p-2 rounded-lg bg-surface-card border border-surface-border hover:border-brand-500/40 text-left transition-colors flex items-center gap-2"
+                className="p-2.5 rounded-xl bg-surface-card border border-surface-border hover:border-blue-500/50 text-left transition-all flex items-center gap-2.5 group"
               >
-                <ChefHat className="w-3.5 h-3.5 text-blue-400" />
+                <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
+                  <ChefHat className="w-4 h-4" />
+                </div>
                 <div>
-                  <div className="font-semibold text-white">Kitchen</div>
-                  <div className="text-[10px] text-slate-400">KDS queue</div>
+                  <div className="font-semibold text-white">Kitchen Chef</div>
+                  <div className="text-[10px] text-slate-400">KDS Display</div>
                 </div>
               </button>
             </div>
@@ -426,7 +430,7 @@ export default function LoginPage() {
 
       {/* Footer */}
       <footer className="text-center text-xs text-slate-500 mt-6">
-        <span>MezFlow Real-Time Operations • BSSE FYP SZABIST Islamabad</span>
+        <span>MezFlow Hospitality Intelligence Platform © 2026 • Enterprise Real-Time Operations</span>
       </footer>
     </div>
   );

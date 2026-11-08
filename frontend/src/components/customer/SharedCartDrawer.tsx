@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { CartResponse, CartItem, Diner } from "@/types/menu";
 import { DinerBadge } from "./DinerBadge";
+import { getDishImage } from "@/lib/dishImages";
 
 interface SharedCartDrawerProps {
   isOpen: boolean;
@@ -334,8 +335,8 @@ export function SharedCartDrawer({
 
             <p className="text-[10px] text-center text-slate-500">
               {isUrdu
-                ? "🔒 قیمتوں کی جانچ کچن سرور خودکار طور پر براہ راست ڈیٹا بیس سے کرتا ہے"
-                : "🔒 Server-authoritative: Prices recalculated directly from kitchen database"}
+                ? "🔒 تصدیق شدہ آرڈر: براہ راست کچن اسکرین پر فوری ترسیل"
+                : "🔒 Verified Order: Guaranteed pricing & direct kitchen line dispatch"}
             </p>
           </div>
         )}
@@ -366,23 +367,32 @@ function CartItemRow({
 }) {
   const itemName = isUrdu && item.item_name_ur ? item.item_name_ur : item.item_name;
   const isYou = item.diner_id === currentDinerId;
+  const dishImg = getDishImage(item.item_name);
 
   return (
     <div className="py-2.5 border-b border-surface-border/40 last:border-0 flex items-start justify-between gap-3">
-      {/* Left Details */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <h4 className="text-xs font-bold text-white truncate">{itemName}</h4>
-          {showDinerBadge && (
-            <DinerBadge
-              name={item.diner_name}
-              avatarColor={item.avatar_color}
-              isYou={isYou}
-              size="xs"
-              showLabel={false}
-            />
-          )}
-        </div>
+      {/* Left Details & Thumbnail */}
+      <div className="flex items-start gap-2.5 flex-1 min-w-0">
+        {dishImg && (
+          <img
+            src={dishImg}
+            alt={itemName}
+            className="w-12 h-12 rounded-xl object-cover border border-surface-border shrink-0 shadow-sm"
+          />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-bold text-white truncate">{itemName}</h4>
+            {showDinerBadge && (
+              <DinerBadge
+                name={item.diner_name}
+                avatarColor={item.avatar_color}
+                isYou={isYou}
+                size="xs"
+                showLabel={false}
+              />
+            )}
+          </div>
 
         {/* Modifiers List */}
         {item.modifiers && item.modifiers.length > 0 && (
@@ -411,6 +421,7 @@ function CartItemRow({
           {currency} {Number(item.unit_price).toLocaleString("en-PK")} each
         </div>
       </div>
+    </div>
 
       {/* Right Controls: Stepper and Line Total */}
       <div className="flex flex-col items-end gap-1.5 shrink-0">

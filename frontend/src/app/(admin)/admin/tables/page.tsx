@@ -94,7 +94,7 @@ export default function AdminTablesPage() {
   const handleRegenerateQR = async (tableId: string, tableNumber: number) => {
     if (
       !confirm(
-        `Are you sure you want to regenerate QR token for Table ${tableNumber}? Any existing printed physical cards for this table will stop working immediately.`
+        `Are you sure you want to regenerate the QR code for Table ${tableNumber}? Any existing printed physical stands for this table will stop working immediately.`
       )
     ) {
       return;
@@ -108,7 +108,7 @@ export default function AdminTablesPage() {
       }
       alert(`QR code for Table ${tableNumber} regenerated successfully.`);
     } catch (err: any) {
-      alert(err.message || "Failed to regenerate QR token");
+      alert(err.message || "Failed to regenerate QR code");
     }
   };
 
@@ -146,7 +146,7 @@ export default function AdminTablesPage() {
               <span>Tables & Physical QR Codes</span>
             </h1>
             <p className="text-xs text-slate-400">
-              Module 2 • Cryptographic Table Tokens, Acrylic Stand Printing & Real-Time Status
+              Table Management • QR Stand Generation, Floor Setup & Real-Time Status
             </p>
           </div>
         </div>
@@ -241,7 +241,7 @@ export default function AdminTablesPage() {
                     </button>
                     <button
                       type="button"
-                      title="Regenerate Token"
+                      title="Regenerate QR Code"
                       onClick={() => handleRegenerateQR(tbl.id, tbl.table_number)}
                       className="p-2 rounded-xl glass-panel text-slate-400 hover:text-rose-400 hover:border-rose-500/40 transition-colors"
                     >

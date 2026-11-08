@@ -35,6 +35,8 @@ import {
   Users,
   Check,
   Bell,
+  X,
+  Flame,
 } from "lucide-react";
 
 export default function CustomerTablePage() {
@@ -453,9 +455,50 @@ export default function CustomerTablePage() {
 
       {/* Main Container */}
       <main className="max-w-2xl mx-auto px-4 pt-3">
+        {/* Restaurant Brand & Table Hero Card (me&u / Sunday App Benchmark) */}
+        <div className="relative rounded-3xl overflow-hidden mb-4 border border-surface-border shadow-2xl group">
+          <div className="h-44 sm:h-52 w-full relative">
+            <img
+              src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80"
+              alt={tableInfo.restaurant_name}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 brightness-[0.72]"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-surface-dark via-surface-dark/50 to-black/30" />
+
+            {/* Top Corner Floating Badges */}
+            <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+              <span className="px-3 py-1 rounded-full bg-slate-900/80 backdrop-blur-md border border-white/15 text-white text-[11px] font-bold flex items-center gap-1.5 shadow-lg">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>{isUrdu ? "کچن لائیو لنک" : "Live Kitchen Link"}</span>
+              </span>
+
+              <span className="px-3 py-1 rounded-full bg-amber-400 text-slate-950 text-[11px] font-black flex items-center gap-1 shadow-lg">
+                ⭐ 4.9 (480+)
+              </span>
+            </div>
+
+            {/* Bottom Restaurant & Table Info */}
+            <div className="absolute bottom-3.5 left-3.5 right-3.5">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight drop-shadow-md">
+                  {tableInfo.restaurant_name}
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-lg bg-brand-500 text-white text-[11px] font-black uppercase tracking-wider shadow">
+                  {tableNameDisplay}
+                </span>
+              </div>
+              <p className="text-xs text-slate-200 line-clamp-1 drop-shadow font-medium">
+                {isUrdu
+                  ? "چارکول باربی کیو، تازہ کڑاہی اور خصوصی موک ٹیلز • لائیو ٹیبل شیئرنگ"
+                  : "Artisanal Charcoal Grills, Handcrafted Karahis & Signature Mocktails"}
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Table Collaborative Presence Bar (WP3.12) */}
         {activeDiners.length > 0 && (
-          <div className="flex items-center justify-between text-xs glass-panel px-3.5 py-2 rounded-2xl border border-surface-border mb-3">
+          <div className="flex items-center justify-between text-xs glass-panel px-3.5 py-2.5 rounded-2xl border border-surface-border mb-3 shadow-sm">
             <div className="flex items-center gap-2">
               <div className="flex -space-x-1.5 rtl:space-x-reverse overflow-hidden">
                 {activeDiners.slice(0, 5).map((d) => (
@@ -472,14 +515,14 @@ export default function CustomerTablePage() {
 
               <span className="text-[11px] text-slate-300 font-medium">
                 {isUrdu
-                  ? `${activeDiners.length} افراد ٹیبل پر موجود ہیں`
+                  ? `${activeDiners.length} افراد ٹیبل پر آرڈر شامل کر رہے ہیں`
                   : `${activeDiners.length} diners collaborating at table`}
               </span>
             </div>
 
             <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>{isUrdu ? "لائیو سنک فعال" : "Live Sync"}</span>
+              <span>{isUrdu ? "لائیو سنک" : "Live Sync"}</span>
             </span>
           </div>
         )}
@@ -496,8 +539,17 @@ export default function CustomerTablePage() {
                 ? "ڈش تلاش کریں (مثلاً: کباب، کڑاہی، برگر)..."
                 : "Search dishes (e.g. kebab, wings, karahi)..."
             }
-            className="w-full text-xs pl-10 pr-4 rtl:pr-10 rtl:pl-4 py-3 rounded-2xl glass-panel border border-surface-border focus:border-brand-500 focus:outline-none text-white placeholder-slate-500"
+            className="w-full text-xs pl-10 pr-9 rtl:pr-10 rtl:pl-9 py-3 rounded-2xl glass-panel border border-surface-border focus:border-brand-500 focus:outline-none text-white placeholder-slate-500"
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery("")}
+              className="absolute top-3 right-3 rtl:left-3 rtl:right-auto text-slate-400 hover:text-white p-0.5"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         {/* Sticky Category Pill Bar with Scrollspy (WP2.8) */}

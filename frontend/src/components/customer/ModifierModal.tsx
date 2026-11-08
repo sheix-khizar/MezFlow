@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { MenuItem, ModifierGroup, ModifierOption, SelectedModifier } from "@/types/menu";
-import { X, Check, Plus, Minus, AlertCircle, Sparkles } from "lucide-react";
+import { X, Check, Plus, Minus, AlertCircle, Sparkles, Clock, Flame, ShieldCheck, Leaf } from "lucide-react";
+import { getDishImage } from "@/lib/dishImages";
 
 interface ModifierModalProps {
   item: MenuItem | null;
@@ -170,29 +171,74 @@ export function ModifierModal({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-lg max-h-[90vh] bg-surface-card border-t border-surface-border rounded-t-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up"
+        className="relative w-full max-w-lg max-h-[92vh] bg-surface-card border-t border-surface-border rounded-t-3xl shadow-2xl flex flex-col overflow-hidden animate-slide-up"
         onClick={(e) => e.stopPropagation()}
         dir={isUrdu ? "rtl" : "ltr"}
       >
-        {/* Drag handle */}
-        <div className="w-12 h-1.5 bg-slate-700 rounded-full mx-auto my-3 shrink-0" />
+        {/* Hero Food Photography Header */}
+        <div className="relative w-full h-44 sm:h-48 shrink-0 bg-surface-dark overflow-hidden">
+          <img
+            src={getDishImage(item)}
+            alt={displayName}
+            className="w-full h-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-surface-card via-surface-card/40 to-transparent" />
 
-        {/* Header */}
-        <div className="px-6 pb-4 border-b border-surface-border flex items-start justify-between">
-          <div>
-            <h2 className="text-xl font-extrabold text-white">{displayName}</h2>
-            <p className="text-xs text-brand-400 mt-0.5">
-              {Number(item.price).toLocaleString()} {currencyDisplay}
-            </p>
-          </div>
+          {/* Drag Pill */}
+          <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/40 rounded-full backdrop-blur-sm" />
+
+          {/* Floating Close Button */}
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="p-2 rounded-full glass-panel text-slate-400 hover:text-white transition-colors"
+            className="absolute top-4 right-4 rtl:right-auto rtl:left-4 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md transition-all shadow-lg"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
+
+          {/* Badges on Hero */}
+          <div className="absolute top-4 left-4 rtl:left-auto rtl:right-4 flex items-center gap-1.5">
+            {item.dietary_tags?.includes("halal") && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/80 text-white font-bold text-[10px] backdrop-blur-sm shadow flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3" />
+                <span>{isUrdu ? "حلال" : "Halal"}</span>
+              </span>
+            )}
+            {item.dietary_tags?.includes("spicy") && (
+              <span className="px-2 py-0.5 rounded-full bg-amber-500/80 text-white font-bold text-[10px] backdrop-blur-sm shadow flex items-center gap-1">
+                <Flame className="w-3 h-3" />
+                <span>{isUrdu ? "تیز" : "Spicy"}</span>
+              </span>
+            )}
+          </div>
+
+          {/* Title & Price Overlay */}
+          <div className="absolute bottom-3 left-6 right-6 flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-black text-white tracking-tight drop-shadow-md">
+                {displayName}
+              </h2>
+              {isUrdu ? (
+                <p className="text-xs text-slate-300 drop-shadow">{item.name}</p>
+              ) : (
+                item.name_ur && (
+                  <p className="text-xs text-slate-300 font-arabic drop-shadow" dir="rtl">
+                    {item.name_ur}
+                  </p>
+                )
+              )}
+            </div>
+
+            <div className="text-right shrink-0">
+              <span className="text-xs text-brand-300 font-medium block">
+                {isUrdu ? "ابتدائی قیمت" : "Base Price"}
+              </span>
+              <span className="text-lg font-black text-white">
+                {Number(item.price).toLocaleString()} {currencyDisplay}
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Scrollable Content */}
