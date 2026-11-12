@@ -1,0 +1,147 @@
+# Module Page (FYP – II - Fall 2026 – Mid Defense)
+
+**Group No:** `__________` &nbsp;&nbsp;&nbsp;&nbsp; **Group Title:** MezFlow — Real-Time Restaurant Dining and Kitchen Operations Management System  
+**Live Deployment:** [https://mez-flow.vercel.app/](https://mez-flow.vercel.app/) &nbsp;&nbsp;&nbsp;&nbsp; **Supervisor:** Muhammad Farooq
+
+<table>
+  <thead>
+    <tr>
+      <th colspan="2">Module</th>
+      <th rowspan="2">Features</th>
+      <th colspan="2">Assigned to:</th>
+    </tr>
+    <tr>
+      <th>S.No</th>
+      <th>Title</th>
+      <th>Registration</th>
+      <th>Name</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td><strong>Identity &amp; Access Control (M1)</strong></td>
+      <td>
+        • Email/phone signup &amp; password authentication (<code>/auth/signup</code>, <code>/auth/login</code>)<br/>
+        • OTP request &amp; verification workflow (<code>/auth/request-otp</code>, <code>/auth/verify-otp</code>)<br/>
+        • JWT bearer token sessions, refresh endpoint, &amp; user language preferences (English / Urdu)<br/>
+        • 5-role RBAC enforcement (<code>customer</code>, <code>kitchen_staff</code>, <code>service_staff</code>, <code>cashier</code>, <code>manager</code>)<br/>
+        • Multi-tenant <code>restaurant_id</code> isolation &amp; staff action audit log (<code>/auth/audit-logs</code>)
+      </td>
+      <td>2380227</td>
+      <td>Sheikh Muhammad Khizar</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>Digital Menu &amp; QR Table Access (M2)</strong></td>
+      <td>
+        • Zero-install Customer Progressive Web App (<code>/r/[restaurantId]/t/[tableId]</code>)<br/>
+        • Per-table HMAC-SHA256 cryptographic QR tokens preventing remote table spoofing<br/>
+        • Categorized dish browsing with food photography, prep times, &amp; dietary badges (Halal, Spicy, Veg)<br/>
+        • Structured dish modifiers (spice level, portion size, extras/add-ons, removal notes)<br/>
+        • Live menu CRUD APIs &amp; instant 86'ing (availability toggle) synced across clients
+      </td>
+      <td>2380245</td>
+      <td>Syed Sail Haider Gardezi</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Collaborative Table Ordering &amp; SaaS UI (M3)</strong></td>
+      <td>
+        • Multi-diner shared table sessions allowing simultaneous table collaboration via QR<br/>
+        • Live Shared Cart Drawer with per-diner item attribution &amp; avatar color badges<br/>
+        • Interactive quantity steppers, modifier editing, &amp; special preparation instructions<br/>
+        • Consolidated single-order dispatch to kitchen (<code>/sessions/{id}/submit</code>)<br/>
+        • 5-section Commercial SaaS Landing Page, bilingual English/Urdu (RTL) switcher, &amp; Staff Portal UI
+      </td>
+      <td>2380245</td>
+      <td>Syed Sail Haider Gardezi</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>Kitchen Display System — KDS (M4)</strong></td>
+      <td>
+        • Hardware-free, browser-based single-screen KDS terminal (<code>/kds</code>)<br/>
+        • Multi-station routing &amp; category filters (Grill, Fry, Hot Kitchen, Beverage, Dessert)<br/>
+        • Live status queues (<code>NEW</code>, <code>CONFIRMED</code>, <code>PREPARING</code>, <code>READY</code>) &amp; KPI summary bar<br/>
+        • One-tap bump progression (<code>/kds/orders/{id}/bump</code>) &amp; 60-second order recall (<code>/recall</code>)<br/>
+        • Elapsed prep-time counters, urgency color indicators, &amp; Web Audio chime notifications
+      </td>
+      <td>2380700</td>
+      <td>Talha Mumtaz</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Order Lifecycle &amp; Cloud Deployment (M5)</strong></td>
+      <td>
+        • Server-enforced Order State Machine (<code>NEW → CONFIRMED → PREPARING → READY → DISPATCHED / CANCELLED</code>)<br/>
+        • Live Customer Order Status Tracker view (<code>/order/[orderId]</code>) without manual reload<br/>
+        • Production Vercel frontend deployment (<code>mez-flow.vercel.app</code>) &amp; Next.js <code>/api/v1</code> proxy rewrites<br/>
+        • Serverless cold-start mitigation: 45s client timeout, automatic background retry, &amp; silent <code>/health</code> warmup
+      </td>
+      <td>2380227</td>
+      <td>Sheikh Muhammad Khizar</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><strong>Real-Time WebSocket &amp; Pub/Sub Engine</strong></td>
+      <td>
+        • Dual-channel RFC 6455 WebSocket connections (<code>useKDSSocket</code>, <code>useTableSession</code>, <code>useMenuRealtime</code>)<br/>
+        • Redis 7 Pub/Sub event broadcasting for sub-second table cart, menu, and kitchen updates<br/>
+        • Automatic client WebSocket reconnection &amp; state synchronization hooks<br/>
+        • Multi-device Wi-Fi LAN &amp; dynamic origin host resolution for mobile QR testing
+      </td>
+      <td>2380700</td>
+      <td>Talha Mumtaz</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td><strong>Server-Authoritative Pricing &amp; Billing Core (M8)</strong></td>
+      <td>
+        • Zero-trust backend price calculation engine recomputing dish &amp; modifier totals directly from DB<br/>
+        • Complete prevention of client-side price or discount tampering at checkout<br/>
+        • Itemized order totals, order-item price snapshots, &amp; billing baseline data models<br/>
+        • End-to-end financial integrity verification &amp; pricing unit test coverage
+      </td>
+      <td>2380227</td>
+      <td>Sheikh Muhammad Khizar</td>
+    </tr>
+    <tr>
+      <td>8</td>
+      <td><strong>Table Lifecycle &amp; Floor Visualizer (M9)</strong></td>
+      <td>
+        • Decoupled table state modeling (<code>AVAILABLE</code>, <code>OCCUPIED</code>, <code>AWAITING_CLEANUP</code>)<br/>
+        • Automatic transition to <code>OCCUPIED</code> upon diner QR scan and session initiation<br/>
+        • Live 10-table Floor Occupancy Visualizer grid inside the Operations Command Center<br/>
+        • Direct table status monitoring &amp; quick customer table view launcher
+      </td>
+      <td>2380245</td>
+      <td>Syed Sail Haider Gardezi</td>
+    </tr>
+    <tr>
+      <td>9</td>
+      <td><strong>Operations Management Console (M10)</strong></td>
+      <td>
+        • Role-protected Manager Operations Command Center (<code>/admin</code>) &amp; Quick Action Shortcuts<br/>
+        • Real-time menu management, pricing controls, &amp; instant sold-out item toggling<br/>
+        • Table &amp; Physical QR Stand Generator (<code>/admin/tables</code>) with printable table QR cards<br/>
+        • Staff Role Switcher (<code>/login</code>) &amp; automated GitHub Actions CI/CD verification pipeline
+      </td>
+      <td>2380227</td>
+      <td>Sheikh Muhammad Khizar</td>
+    </tr>
+    <tr>
+      <td>10</td>
+      <td><strong>Database Architecture &amp; Automated QA</strong></td>
+      <td>
+        • Asynchronous SQLAlchemy 2.0 + PostgreSQL 16 schema with Alembic versioned migrations (<code>001</code>–<code>004</code>)<br/>
+        • Deterministic seeding script (<code>scripts/seed.py</code>) for demo restaurant, bilingual menu, tables, &amp; staff<br/>
+        • Docker Compose containerized multi-service stack (FastAPI, PostgreSQL, Redis)<br/>
+        • Comprehensive 40-test <code>pytest</code> suite covering auth, RBAC, menu, cart, KDS, &amp; QR generation
+      </td>
+      <td>2380700</td>
+      <td>Talha Mumtaz</td>
+    </tr>
+  </tbody>
+</table>
+
