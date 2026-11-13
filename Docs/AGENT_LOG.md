@@ -752,3 +752,21 @@ This document serves as the authoritative, persistent operational log of all int
 - **Git Operations:**
   - Staged `.github/workflows/ci.yml`, `frontend/package.json`, `frontend/package-lock.json`, and `Docs/AGENT_LOG.md`.
   - Committed and pushed to `origin main`.
+
+
+### 3.38. Session 38 — 2026-11-13: Vercel Deployment & Next.js Build Resolution
+- **User Prompt:** "Still?"
+- **Analysis:**
+  - Audited GitHub commit status for `cef874c` via GitHub API.
+  - GitHub Actions CI had passed, but **Vercel's automated deployment check** failed.
+  - Vercel's `next build` failed during prerendering `/404` and `/500` with `PageNotFoundError: Cannot find module for page: /_document` due to missing App Router `not-found.tsx` and `error.tsx`.
+  - Furthermore, `eslint-config-next` was pinned to `14.2.15`, causing peer dependency conflicts during Vercel's `npm install`.
+- **Actions Taken:**
+  - Created `frontend/src/app/not-found.tsx` and `frontend/src/app/error.tsx`.
+  - Updated `eslint-config-next` to `"^14.2.25"` in `frontend/package.json`.
+  - Added `.npmrc` files in repository root and `frontend/` with `legacy-peer-deps=true`.
+  - Updated root `vercel.json` install command with `--legacy-peer-deps`.
+  - Verified `npm run build` compiles 100% cleanly (11/11 static pages generated with 0 errors).
+- **Git Operations:**
+  - Staged and committed all changes (`fix(build): add not-found and error boundaries, update eslint-config-next and vercel config`).
+  - Pushed to `origin main`.
