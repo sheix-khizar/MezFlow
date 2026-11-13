@@ -723,50 +723,21 @@ This document serves as the authoritative, persistent operational log of all int
 - **Git Operations:** None (all changes kept local per user instruction: "Don't update github").
 
 
-### 3.36. Session 36 — 2026-11-13: Production SaaS MVP GitHub Synchronization
-- **User Prompt:** "Now just update github carefully."
-- **Pre-Push Verification:**
-  - TypeScript compilation: 0 errors (`npx tsc --noEmit`).
-  - Pytest backend test suite: 40/40 tests passing (30.94s).
-  - FastAPI daemon healthy (`http://127.0.0.1:8000/api/v1/health`).
-  - Next.js development server healthy (`http://localhost:3001`).
-- **Git Operations:**
-  - Staged 34 modified and new files across backend, frontend, plans, and documentation.
-  - Committed as `5fc8f28`: `feat(saas): implement multi-tenant auth, menu builder, real staff profiles, and polling fallbacks`.
-  - Pushed to `origin main` (`https://github.com/sheix-khizar/MezFlow.git`).
-- **Current Repository State:** Synchronized with remote `origin/main`.
-
-
-### 3.37. Session 37 — 2026-11-13: GitHub Actions CI/CD Pipeline Resolution
-- **User Prompt:** "Why failed?"
-- **Root Cause Analysis:**
-  - Audited GitHub Actions run `#35` via GitHub API (`https://api.github.com/repos/sheix-khizar/MezFlow/actions/runs/43357328769/jobs`).
-  - `backend-test` job succeeded 100% (Alembic migrations, PostgreSQL seed, and 40/40 pytest tests all passed).
-  - `frontend-check` job failed during `Install Dependencies`: npm strict peer resolution returned `ERESOLVE could not resolve: peer next@^14.2.25 from @clerk/nextjs@6.39.9` due to `next: 14.2.15` in `package.json`.
-- **Actions Taken:**
-  - Updated `next` to `"^14.2.25"` in `frontend/package.json` (resolving to `14.2.35`).
-  - Added `--legacy-peer-deps` to `.github/workflows/ci.yml` `npm install` step to prevent CI halts on minor patch-version peer constraints.
-  - Regenerated `frontend/package-lock.json`.
-  - Re-verified `npx tsc --noEmit`: 0 errors.
-  - Restarted local Next.js dev server on port 3001 (verified HTTP 200 OK).
-- **Git Operations:**
-  - Staged `.github/workflows/ci.yml`, `frontend/package.json`, `frontend/package-lock.json`, and `Docs/AGENT_LOG.md`.
-  - Committed and pushed to `origin main`.
-
-
-### 3.38. Session 38 — 2026-11-13: Vercel Deployment & Next.js Build Resolution
-- **User Prompt:** "Still?"
-- **Analysis:**
-  - Audited GitHub commit status for `cef874c` via GitHub API.
-  - GitHub Actions CI had passed, but **Vercel's automated deployment check** failed.
-  - Vercel's `next build` failed during prerendering `/404` and `/500` with `PageNotFoundError: Cannot find module for page: /_document` due to missing App Router `not-found.tsx` and `error.tsx`.
-  - Furthermore, `eslint-config-next` was pinned to `14.2.15`, causing peer dependency conflicts during Vercel's `npm install`.
-- **Actions Taken:**
-  - Created `frontend/src/app/not-found.tsx` and `frontend/src/app/error.tsx`.
-  - Updated `eslint-config-next` to `"^14.2.25"` in `frontend/package.json`.
-  - Added `.npmrc` files in repository root and `frontend/` with `legacy-peer-deps=true`.
-  - Updated root `vercel.json` install command with `--legacy-peer-deps`.
-  - Verified `npm run build` compiles 100% cleanly (11/11 static pages generated with 0 errors).
-- **Git Operations:**
-  - Staged and committed all changes (`fix(build): add not-found and error boundaries, update eslint-config-next and vercel config`).
-  - Pushed to `origin main`.
+### 3.36. Session 36 — 2026-11-13: Implementation of Database Password Reset with Terminal OTP Delivery
+- **User Prompt:** "Now implement optioon 2 nd otp should be come in terminal."
+- **Architecture & Implementation:**
+  - **Backend Schemas (`backend/app/schemas/auth.py`):**
+    - `ForgotPasswordRequest`: Validates account email.
+    - `ResetPasswordRequest`: Validates email, 6-digit numeric OTP code, and new password (min 6 chars).
+  - **Backend Endpoints (`backend/app/api/v1/endpoints/auth.py`):**
+    - `POST /api/v1/auth/forgot-password`: Queries PostgreSQL for the user, creates a 5-minute cryptographic OTP via `OTPService` in Redis, and prints a formatted OTP banner to the terminal stdout (`flush=True`).
+    - `POST /api/v1/auth/reset-password`: Verifies OTP code, updates `hashed_password` using bcrypt in PostgreSQL, records an audit log entry, and issues an active JWT `TokenResponse` for instant authenticated login.
+  - **Frontend UI (`frontend/src/app/login/page.tsx`):**
+    - Added "Forgot password?" button next to the password field.
+    - Added an interactive 2-step modal with terminal notice, email dispatch, 6-digit code validation, and new password confirmation.
+  - **Automated Tests (`backend/tests/test_auth.py`):**
+    - Added `test_forgot_password_and_reset_flow` verifying request, reset, and subsequent login.
+  - **Verification:**
+    - TypeScript compilation: 0 errors (`npx tsc --noEmit`).
+    - Backend Pytest Suite: 41/41 tests passing (27.21s).
+- **Git Operations:** Created isolated branch `NewMezflow` and pushed to `origin/NewMezflow` without modifying `main` branch.

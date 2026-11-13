@@ -14,6 +14,10 @@ import {
   Eye,
   EyeOff,
   Building2,
+  KeyRound,
+  Terminal,
+  Check,
+  X,
 } from "lucide-react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useAuthStore } from "@/lib/authStore";
@@ -39,6 +43,18 @@ export default function LoginPage() {
     restaurant_id: string;
   }
   const [savedProfiles, setSavedProfiles] = useState<SavedProfile[]>([]);
+
+  // Forgot Password States
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotStep, setForgotStep] = useState<"email" | "code">("email");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotCode, setForgotCode] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
 
   useEffect(() => {
     warmupBackend();
@@ -152,6 +168,87 @@ export default function LoginPage() {
     setError(null);
   };
 
+  const handleRequestResetCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) {
+      setForgotError(isUrdu ? "براہ کرم ای میل درج کریں۔" : "Please enter your business email.");
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError(null);
+    try {
+      await apiClient.post("/auth/forgot-password", {
+        email: forgotEmail.trim(),
+      });
+      setForgotStep("code");
+      setForgotSuccess(
+        isUrdu
+          ? "او ٹی پی کوڈ بیک اینڈ ٹرمینل میں پرنٹ کر دیا گیا ہے!"
+          : "6-digit OTP code has been generated and printed in your backend terminal!"
+      );
+    } catch (err: any) {
+      setForgotError(err.message || "Failed to send reset code. Please verify the email exists.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotCode.trim() || forgotCode.length !== 6) {
+      setForgotError(isUrdu ? "براہ کرم 6 ہندسوں کا درست کوڈ درج کریں۔" : "Please enter the valid 6-digit code.");
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      setForgotError(isUrdu ? "پاس ورڈ کم از کم 6 حروف کا ہونا چاہیے۔" : "Password must be at least 6 characters.");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError(isUrdu ? "پاس ورڈ میچ نہیں کر رہے۔" : "Passwords do not match.");
+      return;
+    }
+
+    setForgotLoading(true);
+    setForgotError(null);
+    try {
+      const res = await apiClient.post("/auth/reset-password", {
+        email: forgotEmail.trim(),
+        code: forgotCode.trim(),
+        new_password: forgotNewPassword,
+      });
+
+      const data = res.data;
+      setAuth(data.access_token, {
+        id: data.user_id,
+        restaurant_id: data.restaurant_id,
+        role: data.role,
+        is_active: true,
+        is_verified: true,
+        profile: {
+          id: data.user_id,
+          display_name: data.display_name || "Staff Member",
+          preferred_language: data.preferred_language || "en",
+          push_notifications_enabled: true,
+        },
+      });
+
+      setForgotSuccess(
+        isUrdu
+          ? "پاس ورڈ کامیابی سے تبدیل ہو گیا! لاگ ان ہو رہے ہیں..."
+          : "Password reset successful! Logging you in..."
+      );
+
+      setTimeout(() => {
+        setIsForgotModalOpen(false);
+        handleRoleRedirect(data.role);
+      }, 900);
+    } catch (err: any) {
+      setForgotError(err.message || "Failed to reset password. Please verify the code.");
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface-dark flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-brand-500 selection:text-white">
       {/* Top Header */}
@@ -241,6 +338,22 @@ export default function LoginPage() {
                 <label className="block text-xs font-medium text-slate-300">
                   {isUrdu ? "پاس ورڈ" : "Password"}
                 </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotEmail(email.trim());
+                    setForgotStep("email");
+                    setForgotError(null);
+                    setForgotSuccess(null);
+                    setForgotCode("");
+                    setForgotNewPassword("");
+                    setForgotConfirmPassword("");
+                    setIsForgotModalOpen(true);
+                  }}
+                  className="text-[11px] text-brand-400 hover:text-brand-300 font-semibold transition-colors"
+                >
+                  {isUrdu ? "پاس ورڈ بھول گئے؟" : "Forgot password?"}
+                </button>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -363,6 +476,204 @@ export default function LoginPage() {
           </div>
         </div>
       </main>
+
+      {/* MODAL: FORGOT & RESET PASSWORD */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-surface-card border border-surface-border rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl relative overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-surface-border">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-brand-500/10 text-brand-400 flex items-center justify-center">
+                  <KeyRound className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">
+                    {isUrdu ? "پاس ورڈ ری سیٹ کریں" : "Reset Workspace Password"}
+                  </h3>
+                  <span className="text-[10px] text-slate-400">
+                    {forgotStep === "email"
+                      ? isUrdu
+                        ? "مرحلہ 1: اپنا رجسٹرڈ ای میل درج کریں"
+                        : "Step 1 of 2: Enter registered business email"
+                      : isUrdu
+                      ? "مرحلہ 2: ٹرمینل کوڈ اور نیا پاس ورڈ درج کریں"
+                      : "Step 2 of 2: Enter terminal OTP & new password"}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsForgotModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Terminal Notice */}
+            <div className="mb-4 p-3 rounded-2xl bg-brand-500/10 border border-brand-500/20 text-brand-300 text-xs flex items-start gap-2.5">
+              <Terminal className="w-4 h-4 shrink-0 text-brand-400 mt-0.5" />
+              <div className="text-[11px] leading-relaxed">
+                <span className="font-bold text-white block mb-0.5">Terminal OTP Delivery:</span>
+                Your 6-digit verification code will be printed directly in your backend terminal console!
+              </div>
+            </div>
+
+            {/* Alerts */}
+            {forgotError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{forgotError}</span>
+              </div>
+            )}
+
+            {forgotSuccess && (
+              <div className="mb-4 p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <span>{forgotSuccess}</span>
+              </div>
+            )}
+
+            {/* STEP 1: ENTER EMAIL */}
+            {forgotStep === "email" ? (
+              <form onSubmit={handleRequestResetCode} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                    {isUrdu ? "اکاؤنٹ ای میل ایڈریس *" : "Account Email Address *"}
+                  </label>
+                  <div className="relative">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="manager@restaurant.com"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      className="w-full bg-surface-dark border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotModalOpen(false)}
+                    className="px-4 py-2 rounded-xl glass-panel text-slate-400 hover:text-white text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-brand-500/25"
+                  >
+                    {forgotLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    )}
+                    <span>Send Reset Code ➔</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* STEP 2: ENTER OTP & NEW PASSWORD */
+              <form onSubmit={handleResetPassword} className="space-y-3.5">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-medium text-slate-300">
+                      {isUrdu ? "6 ہندسوں کا کوڈ (ٹرمینل چیک کریں) *" : "6-Digit Code (Check Terminal) *"}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setForgotStep("email")}
+                      className="text-[10px] text-slate-400 hover:text-white underline"
+                    >
+                      Change Email
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    placeholder="123456"
+                    value={forgotCode}
+                    onChange={(e) => setForgotCode(e.target.value.replace(/\D/g, ""))}
+                    className="w-full bg-surface-dark border border-surface-border rounded-xl px-4 py-2 text-center text-lg font-mono tracking-widest text-white placeholder-slate-600 focus:outline-none focus:border-brand-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    {isUrdu ? "نیا پاس ورڈ (کم از کم 6 حروف) *" : "New Password (min 6 chars) *"}
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type={showForgotNewPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      placeholder="••••••••"
+                      value={forgotNewPassword}
+                      onChange={(e) => setForgotNewPassword(e.target.value)}
+                      className="w-full bg-surface-dark border border-surface-border rounded-xl pl-10 pr-10 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                    >
+                      {showForgotNewPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">
+                    {isUrdu ? "نئے پاس ورڈ کی تصدیق کریں *" : "Confirm New Password *"}
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type={showForgotNewPassword ? "text" : "password"}
+                      required
+                      minLength={6}
+                      placeholder="••••••••"
+                      value={forgotConfirmPassword}
+                      onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                      className="w-full bg-surface-dark border border-surface-border rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2 flex items-center justify-end gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotModalOpen(false)}
+                    className="px-4 py-2 rounded-xl glass-panel text-slate-400 hover:text-white text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="px-5 py-2 rounded-xl bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-brand-500/25"
+                  >
+                    {forgotLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Check className="w-3.5 h-3.5" />
+                    )}
+                    <span>Reset Password & Sign In</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="text-center text-slate-500 text-[11px] py-4">

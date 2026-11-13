@@ -266,3 +266,43 @@ async def test_duplicate_email_in_same_restaurant_rejected(client: AsyncClient):
     second_res = await client.post("/api/v1/auth/signup", json=payload)
     assert second_res.status_code == 400
     assert "already exists" in second_res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_forgot_password_and_reset_flow(client: AsyncClient):
+    """TEST-M1-13: Verifies forgot password code generation and reset flow with PostgreSQL update."""
+    target_email = "manager@mezflow.com"
+
+    # 1. Request reset code
+    req_res = await client.post("/api/v1/auth/forgot-password", json={"email": target_email})
+    assert req_res.status_code == 200
+    data = req_res.json()
+    assert data["success"] is True
+    code = data.get("debug_code")
+    assert code is not None
+    assert len(code) == 6
+
+    # 2. Reset password using the OTP code
+    new_pass = "brandNewManagerPassword2026!"
+    reset_res = await client.post("/api/v1/auth/reset-password", json={
+        "email": target_email,
+        "code": code,
+        "new_password": new_pass,
+    })
+    assert reset_res.status_code == 200
+    assert "access_token" in reset_res.json()
+
+    # 3. Verify new password works on login
+    login_res = await client.post("/api/v1/auth/login", json={
+        "username": target_email,
+        "password": new_pass,
+    })
+    assert login_res.status_code == 200
+
+    # 4. Restore original password for other tests
+    restore_code = (await client.post("/api/v1/auth/forgot-password", json={"email": target_email})).json()["debug_code"]
+    await client.post("/api/v1/auth/reset-password", json={
+        "email": target_email,
+        "code": restore_code,
+        "new_password": "manager123",
+    })

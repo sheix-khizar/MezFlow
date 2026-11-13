@@ -110,3 +110,13 @@ class OnboardingRequest(BaseModel):
     phone: Optional[str] = None
     currency: Optional[str] = Field(None, min_length=3, max_length=10)
     display_name: Optional[str] = Field(None, min_length=2, max_length=100)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr = Field(..., description="Registered account email")
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr = Field(..., description="Registered account email")
+    code: str = Field(..., min_length=6, max_length=6, pattern="^[0-9]{6}$", description="6-digit OTP code")
+    new_password: str = Field(..., min_length=6, description="New password (minimum 6 characters)")

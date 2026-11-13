@@ -29,6 +29,8 @@ from app.schemas.auth import (
     AuditLogResponse,
     RestaurantRegisterRequest,
     OnboardingRequest,
+    ForgotPasswordRequest,
+    ResetPasswordRequest,
 )
 from app.services.otp import OTPService
 from app.services.audit import record_audit_log
@@ -563,6 +565,130 @@ async def verify_otp(
         user_id=user_loaded.id,
         display_name=user_loaded.profile.display_name if user_loaded.profile else None,
         preferred_language=user_loaded.profile.preferred_language if user_loaded.profile else "en",
+    )
+
+
+@router.post(
+    "/forgot-password",
+    tags=["Authentication"],
+    summary="Request a password reset OTP code (prints directly to terminal)",
+)
+async def forgot_password(
+    data: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Validates that the user exists in PostgreSQL, generates a 6-digit OTP in Redis,
+    and prints it prominently to the backend terminal for local verification.
+    """
+    clean_email = data.email.strip().lower()
+
+    # 1. Verify user exists in PostgreSQL
+    stmt = select(User).where(User.email == clean_email)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No account found with email '{clean_email}'.",
+        )
+
+    # 2. Generate and cache 6-digit OTP
+    code = await OTPService.request_otp(f"reset:{clean_email}")
+
+    # 3. Print prominently to terminal
+    print("\n" + "=" * 60, flush=True)
+    print(f"🔑 [MEZFLOW PASSWORD RESET OTP]", flush=True)
+    print(f"📧 Account:       {clean_email}", flush=True)
+    print(f"🔢 6-Digit OTP:   >>> {code} <<<", flush=True)
+    print(f"⏳ Expiration:    5 minutes", flush=True)
+    print("=" * 60 + "\n", flush=True)
+
+    return {
+        "success": True,
+        "message": f"Verification code generated and printed to terminal for '{clean_email}'.",
+        "email": clean_email,
+        "debug_code": code if settings.ENVIRONMENT == "development" else None,
+    }
+
+
+@router.post(
+    "/reset-password",
+    response_model=TokenResponse,
+    tags=["Authentication"],
+    summary="Verify OTP and update user password",
+)
+async def reset_password(
+    data: ResetPasswordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Verifies the 6-digit OTP code against Redis, updates the bcrypt password in PostgreSQL,
+    and returns a fresh JWT authentication token.
+    """
+    clean_email = data.email.strip().lower()
+
+    # 1. Verify OTP code
+    is_valid, err_msg = await OTPService.verify_otp(f"reset:{clean_email}", data.code)
+    if not is_valid:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=err_msg or "Invalid or expired reset code.",
+        )
+
+    # 2. Fetch user
+    stmt = (
+        select(User)
+        .options(selectinload(User.profile))
+        .where(User.email == clean_email)
+    )
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Account not found.",
+        )
+
+    # 3. Update password hash
+    user.hashed_password = get_password_hash(data.new_password)
+    user.updated_at = datetime.now(timezone.utc)
+
+    # 4. Audit Log
+    ip = _get_client_ip(request)
+    if user.restaurant_id:
+        await record_audit_log(
+            db=db,
+            restaurant_id=user.restaurant_id,
+            user_id=user.id,
+            action="PASSWORD_RESET_SUCCESS",
+            resource_type="user",
+            resource_id=str(user.id),
+            details={"email": clean_email},
+            ip_address=ip,
+        )
+
+    await db.commit()
+    await db.refresh(user)
+
+    # 5. Issue JWT Token
+    token = create_access_token(
+        subject=str(user.id),
+        claims={
+            "role": user.role.value,
+            "restaurant_id": str(user.restaurant_id) if user.restaurant_id else None,
+        },
+    )
+
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        role=user.role.value,
+        restaurant_id=user.restaurant_id,
+        user_id=user.id,
+        display_name=user.profile.display_name if user.profile else clean_email.split("@")[0],
+        preferred_language=user.profile.preferred_language if user.profile else "en",
     )
 
 
