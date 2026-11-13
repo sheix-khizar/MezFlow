@@ -490,8 +490,8 @@ export default function SignUpPage() {
               {/* Clean Divider */}
               <div className="relative flex items-center justify-center mb-5">
                 <div className="border-t border-surface-border w-full" />
-                <span className="bg-surface-card px-3 text-[11px] font-medium text-slate-500 uppercase tracking-wider">
-                  {isUrdu ? "یا ریستورانٹ ای میل سے شروع کریں" : "or continue with work email"}
+                <span className="bg-surface-card px-3 text-[9px] font-medium text-slate-500 uppercase tracking-wider">
+                  {isUrdu ? "یا ریستورانٹ ای میل سے شروع کریں" : "or continue with email"}
                 </span>
                 <div className="border-t border-surface-border w-full" />
               </div>
