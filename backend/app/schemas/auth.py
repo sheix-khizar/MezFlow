@@ -90,3 +90,23 @@ class AuditLogResponse(BaseModel):
     details: Optional[Dict[str, Any]] = None
     ip_address: Optional[str] = None
     created_at: datetime
+
+
+class RestaurantRegisterRequest(BaseModel):
+    restaurant_name: str = Field(..., min_length=2, max_length=255)
+    manager_name: str = Field(..., min_length=2, max_length=100)
+    email: EmailStr
+    password: Optional[str] = Field(None, min_length=6)
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    currency: str = Field("PKR", min_length=3, max_length=10)
+    clerk_user_id: Optional[str] = None
+    clerk_org_id: Optional[str] = None
+
+
+class OnboardingRequest(BaseModel):
+    restaurant_name: Optional[str] = Field(None, min_length=2, max_length=255)
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    currency: Optional[str] = Field(None, min_length=3, max_length=10)
+    display_name: Optional[str] = Field(None, min_length=2, max_length=100)

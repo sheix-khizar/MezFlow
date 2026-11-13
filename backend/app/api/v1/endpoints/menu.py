@@ -403,6 +403,183 @@ async def update_item(
     return MenuItemResponse.model_validate(item)
 
 
+@router.delete(
+    "/menu/items/{item_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    tags=["Menu Administration"],
+    summary="Delete a menu dish",
+)
+async def delete_item(
+    item_id: UUID,
+    current_user: User = Depends(require_manager()),
+    db: AsyncSession = Depends(get_db),
+):
+    """Deletes a dish from the manager's tenant restaurant and broadcasts event."""
+    query = select(MenuItem).where(
+        MenuItem.id == item_id,
+        MenuItem.restaurant_id == current_user.restaurant_id,
+    )
+    res = await db.execute(query)
+    item = res.scalar_one_or_none()
+    if not item:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Menu item not found.")
+
+    await db.delete(item)
+    await db.commit()
+
+    await menu_connection_manager.publish_event(
+        restaurant_id=current_user.restaurant_id,
+        event_data={
+            "event": "MENU_ITEM_DELETED",
+            "item_id": str(item_id),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    return None
+
+
+@router.post(
+    "/menu/seed-starter-dishes",
+    status_code=status.HTTP_201_CREATED,
+    tags=["Menu Administration"],
+    summary="Seed authentic starter dishes across existing categories for this restaurant",
+)
+async def seed_starter_dishes(
+    current_user: User = Depends(require_manager()),
+    db: AsyncSession = Depends(get_db),
+):
+    """Populates 8 sample dishes across the restaurant's categories."""
+    rest_id = current_user.restaurant_id
+    cat_stmt = select(MenuCategory).where(MenuCategory.restaurant_id == rest_id).order_by(MenuCategory.sort_order)
+    cat_res = await db.execute(cat_stmt)
+    categories = cat_res.scalars().all()
+
+    if not categories:
+        cat_defs = [
+            ("Starters & Appetizers", 1),
+            ("Main Course", 2),
+            ("Beverages & Drinks", 3),
+            ("Desserts", 4),
+        ]
+        categories = []
+        for c_name, s_order in cat_defs:
+            new_cat = MenuCategory(restaurant_id=rest_id, name=c_name, sort_order=s_order)
+            db.add(new_cat)
+            categories.append(new_cat)
+        await db.flush()
+
+    cat_map = {c.name.lower(): c.id for c in categories}
+    starters_id = cat_map.get("starters & appetizers") or categories[0].id
+    main_id = cat_map.get("main course") or (categories[1].id if len(categories) > 1 else categories[0].id)
+    drinks_id = cat_map.get("beverages & drinks") or (categories[2].id if len(categories) > 2 else categories[0].id)
+    desserts_id = cat_map.get("desserts") or (categories[3].id if len(categories) > 3 else categories[0].id)
+
+    starter_dishes = [
+        {
+            "category_id": starters_id,
+            "name": "Crispy Mozzarella Sticks",
+            "name_ur": "کرسپی موزریلا سٹکس",
+            "description": "Golden crumbed mozzarella cheese with spicy marinara dipping sauce.",
+            "description_ur": "موزریلا پنیر اور مسالہ دار ساس۔",
+            "price": 650.00,
+            "kitchen_station": "fryer",
+            "expected_prep_minutes": 10,
+            "dietary_tags": ["vegetarian", "halal"],
+            "image_url": "https://images.unsplash.com/photo-1548340748-6d2b7d7da280?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": starters_id,
+            "name": "Dynamite Buffalo Wings",
+            "name_ur": "ڈائنامائٹ بفیلو ونگز",
+            "description": "Crispy fried chicken wings tossed in tangy buffalo glaze with ranch.",
+            "description_ur": "کرسپی چکن ونگز اور بفیلو ساس۔",
+            "price": 850.00,
+            "kitchen_station": "fryer",
+            "expected_prep_minutes": 12,
+            "dietary_tags": ["halal"],
+            "image_url": "https://images.unsplash.com/photo-1567620832903-9fc6debc209f?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": main_id,
+            "name": "Royal Chicken Karahi",
+            "name_ur": "شاہی چکن کڑاہی",
+            "description": "Tender chicken cooked with fresh tomatoes, ginger, and roasted spices in a traditional wok.",
+            "description_ur": "روایتی کڑاہی میں تیار شدہ تازہ چکن اور مسالے۔",
+            "price": 1650.00,
+            "kitchen_station": "hot_kitchen",
+            "expected_prep_minutes": 20,
+            "dietary_tags": ["halal", "spicy"],
+            "image_url": "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": main_id,
+            "name": "Gourmet Angus Beef Burger",
+            "name_ur": "گورمے بیف برگر",
+            "description": "Juicy grilled beef patty with aged cheddar, caramelized onions, and secret sauce on brioche.",
+            "description_ur": "گرلڈ بیف پیٹی اور چیڈر پنیر برگر۔",
+            "price": 1250.00,
+            "kitchen_station": "grill",
+            "expected_prep_minutes": 15,
+            "dietary_tags": ["halal"],
+            "image_url": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": drinks_id,
+            "name": "Fresh Mint Lemonade",
+            "name_ur": "تازہ پودینہ لیمونیڈ",
+            "description": "Crushed mint leaves, fresh lime juice, black salt, and sparkling soda.",
+            "description_ur": "پودینہ، لیموں کا رس اور سوڈا۔",
+            "price": 350.00,
+            "kitchen_station": "drinks",
+            "expected_prep_minutes": 5,
+            "dietary_tags": ["vegetarian", "halal"],
+            "image_url": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": drinks_id,
+            "name": "Traditional Karak Chai",
+            "name_ur": "روایتی کڑک چائے",
+            "description": "Slowly brewed black tea leaves with evaporated milk and crushed cardamom.",
+            "description_ur": "دودھ پتی کڑک چائے الائچی کے ساتھ۔",
+            "price": 180.00,
+            "kitchen_station": "drinks",
+            "expected_prep_minutes": 6,
+            "dietary_tags": ["halal"],
+            "image_url": "https://images.unsplash.com/photo-1571934811356-5cc061b6821f?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": desserts_id,
+            "name": "Warm Chocolate Lava Cake",
+            "name_ur": "گرم چاکلیٹ لاوا کیک",
+            "description": "Decadent dark chocolate molten cake with a scoop of artisanal vanilla ice cream.",
+            "description_ur": "گرم چاکلیٹ کیک اور ونیلا آئس کریم۔",
+            "price": 750.00,
+            "kitchen_station": "dessert",
+            "expected_prep_minutes": 10,
+            "dietary_tags": ["vegetarian", "halal"],
+            "image_url": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": desserts_id,
+            "name": "Authentic Warm Gulab Jamun",
+            "name_ur": "خالص گرم گلاب جامن",
+            "description": "Tender milk-solid dumplings soaked in rose and cardamom saffron syrup.",
+            "description_ur": "زعفرانی شیرے میں ڈوبے ہوئے گلاب جامن۔",
+            "price": 450.00,
+            "kitchen_station": "dessert",
+            "expected_prep_minutes": 5,
+            "dietary_tags": ["vegetarian", "halal"],
+            "image_url": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80",
+        },
+    ]
+
+    for d_item in starter_dishes:
+        db.add(MenuItem(restaurant_id=rest_id, **d_item))
+
+    await db.commit()
+    return {"status": "success", "seeded_count": len(starter_dishes)}
+
+
 # =============================================================================
 # MODIFIER GROUPS & OPTIONS ADMINISTRATION (Manager Only)
 # =============================================================================

@@ -1,47 +1,57 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Lock,
   Mail,
-  Phone,
-  KeyRound,
   ArrowRight,
   Sparkles,
-  ShieldCheck,
-  CheckCircle2,
   AlertCircle,
+  CheckCircle2,
   Loader2,
-  ChefHat,
-  LayoutDashboard,
-  UtensilsCrossed,
+  Eye,
+  EyeOff,
+  Building2,
 } from "lucide-react";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useAuthStore } from "@/lib/authStore";
 import apiClient, { warmupBackend } from "@/lib/api";
 
-// Demo Restaurant ID from database seed
-const DEMO_RESTAURANT_ID = "52dc0556-c8c6-4131-be96-6643f9cc35b0";
-
 export default function LoginPage() {
   const router = useRouter();
   const { setAuth, language } = useAuthStore();
+  const isUrdu = language === "ur";
 
-  useEffect(() => {
-    warmupBackend();
-  }, []);
-
-  const [authMode, setAuthMode] = useState<"password" | "otp">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
-  const [otpCode, setOtpCode] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  interface SavedProfile {
+    email: string;
+    displayName: string;
+    role: string;
+    restaurant_id: string;
+  }
+  const [savedProfiles, setSavedProfiles] = useState<SavedProfile[]>([]);
+
+  useEffect(() => {
+    warmupBackend();
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("mezflow_saved_profiles");
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) setSavedProfiles(list);
+        }
+      } catch (e) {}
+    }
+  }, []);
 
   const handleRoleRedirect = (role: string) => {
     switch (role) {
@@ -51,6 +61,12 @@ export default function LoginPage() {
       case "kitchen_staff":
         router.push("/kds");
         break;
+      case "service_staff":
+        router.push("/waiter");
+        break;
+      case "cashier":
+        router.push("/cashier");
+        break;
       case "customer":
       default:
         router.push("/r/demo-bistro/t/table-4");
@@ -58,47 +74,14 @@ export default function LoginPage() {
     }
   };
 
-  const handlePasswordLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      const res = await apiClient.post("/auth/login", {
-        username: email.trim(),
-        password: password,
-      });
-
-      const data = res.data;
-      setAuth(data.access_token, {
-        id: data.user_id,
-        restaurant_id: data.restaurant_id,
-        role: data.role,
-        is_active: true,
-        is_verified: true,
-        profile: {
-          id: data.user_id,
-          display_name: data.display_name || "User",
-          preferred_language: data.preferred_language || "en",
-          push_notifications_enabled: true,
-        },
-      });
-
-      setSuccessMsg("Authentication successful! Redirecting...");
-      setTimeout(() => {
-        handleRoleRedirect(data.role);
-      }, 700);
-    } catch (err: any) {
-      setError(err.message || "Invalid credentials. Please check and try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone.trim()) {
-      setError("Please enter a valid phone number.");
+    if (!email.trim() || !password) {
+      setError(
+        isUrdu
+          ? "براہ کرم ای میل اور پاس ورڈ درج کریں۔"
+          : "Please enter your email and password."
+      );
       return;
     }
 
@@ -106,35 +89,9 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await apiClient.post("/auth/request-otp", {
-        destination: phone.trim(),
-      });
-      setOtpSent(true);
-      const code = res.data.debug_otp;
-      setSuccessMsg(
-        code
-          ? `OTP generated: ${code} (Auto-filled for testing)`
-          : "OTP sent to your number!"
-      );
-      if (code) {
-        setOtpCode(code);
-      }
-    } catch (err: any) {
-      setError(err.message || "Failed to dispatch OTP.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      const res = await apiClient.post("/auth/verify-otp", {
-        destination: phone.trim(),
-        code: otpCode.trim(),
+      const res = await apiClient.post("/auth/login", {
+        username: email.trim(),
+        password,
       });
 
       const data = res.data;
@@ -146,295 +103,270 @@ export default function LoginPage() {
         is_verified: true,
         profile: {
           id: data.user_id,
-          display_name: data.display_name || "Guest Diner",
+          display_name: data.display_name || "Staff Member",
           preferred_language: data.preferred_language || "en",
           push_notifications_enabled: true,
         },
       });
 
-      setSuccessMsg("OTP verified! Redirecting to your table...");
+      // Save real profile for fast multi-tenant switching on this device
+      if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem("mezflow_saved_profiles");
+          let list: SavedProfile[] = raw ? JSON.parse(raw) : [];
+          list = list.filter((p) => p.email.toLowerCase() !== email.trim().toLowerCase());
+          list.unshift({
+            email: email.trim(),
+            displayName: data.display_name || email.trim().split("@")[0],
+            role: data.role,
+            restaurant_id: data.restaurant_id,
+          });
+          localStorage.setItem("mezflow_saved_profiles", JSON.stringify(list.slice(0, 4)));
+        } catch (e) {}
+      }
+
+      setSuccessMsg(
+        isUrdu
+          ? "لاگ ان کامیاب! کنسول پر منتقل ہو رہے ہیں..."
+          : "Welcome back! Directing to your workspace..."
+      );
+
       setTimeout(() => {
         handleRoleRedirect(data.role);
       }, 700);
     } catch (err: any) {
-      setError(err.message || "Invalid or expired OTP code.");
+      setError(
+        err.message ||
+          (isUrdu
+            ? "غلط ای میل یا پاس ورڈ۔ براہ کرم دوبارہ کوشش کریں۔"
+            : "Invalid credentials. Please verify your email and password.")
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Quick preset helper for evaluator demo
-  const fillPreset = (roleEmail: string, rolePass: string) => {
-    setAuthMode("password");
-    setEmail(roleEmail);
-    setPassword(rolePass);
+  const handleSelectSavedProfile = (profileEmail: string) => {
+    setEmail(profileEmail);
+    setPassword("");
     setError(null);
   };
 
   return (
-    <div className="min-h-screen bg-surface-dark flex flex-col justify-between p-4 sm:p-6 lg:p-8">
-      {/* Top Bar */}
+    <div className="min-h-screen bg-surface-dark flex flex-col justify-between p-4 sm:p-6 lg:p-8 selection:bg-brand-500 selection:text-white">
+      {/* Top Header */}
       <header className="flex items-center justify-between max-w-5xl mx-auto w-full mb-6">
         <Link
           href="/"
-          className="text-base font-extrabold text-white tracking-tight flex items-center gap-2 hover:opacity-90"
+          className="text-base font-extrabold text-white tracking-tight flex items-center gap-2.5 hover:opacity-90 transition-opacity"
         >
-          <span className="w-8 h-8 rounded-lg bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400 font-bold text-sm">
+          <span className="w-8 h-8 rounded-xl bg-brand-500 flex items-center justify-center text-white shadow-lg shadow-brand-500/25 text-sm font-black">
             M
           </span>
-          <span>MezFlow</span>
+          <span className="text-lg font-black tracking-tight">MezFlow</span>
         </Link>
-        <LanguageToggle />
+        <div className="flex items-center gap-3">
+          <LanguageToggle />
+          <Link
+            href="/signup"
+            className="text-xs font-bold text-white hover:text-white px-3.5 py-1.5 rounded-xl border border-surface-border bg-surface-card hover:bg-surface-border/50 transition-colors shadow-sm"
+          >
+            {isUrdu ? "نیا ریستورانٹ رجسٹر کریں" : "Register Restaurant"}
+          </Link>
+        </div>
       </header>
 
-      {/* Main Authentication Card */}
-      <main className="max-w-md mx-auto w-full my-auto">
-        <div className="glass-panel p-8 rounded-3xl border border-white/10 shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-brand-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* Main SaaS Sign In Card */}
+      <main className="max-w-md mx-auto w-full">
+        <div className="bg-surface-card border border-surface-border rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+          {/* Subtle Ambient Radial Glow */}
+          <div className="absolute top-0 right-0 w-60 h-60 bg-brand-500/10 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
+          <div className="absolute bottom-0 left-0 w-60 h-60 bg-purple-500/5 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16" />
 
-          {/* Title */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 text-brand-400 text-xs font-semibold mb-3 border border-brand-500/20">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Staff & Operations Portal</span>
+          {/* Heading */}
+          <div className="text-center mb-6 relative">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-400 text-xs font-semibold mb-3">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{isUrdu ? "آپریشنز پورٹل" : "Restaurant Operations Portal"}</span>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">
-              {language === "ur" ? "سسٹم میں لاگ ان کریں" : "Sign In to MezFlow"}
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+              {isUrdu ? "خوش آمدید" : "Welcome Back"}
             </h1>
-            <p className="text-xs text-slate-400">
-              {language === "ur"
-                ? "انتظامیہ اور کچن عملے کے لیے محفوظ لاگ ان"
-                : "Secure role-based portal for restaurant managers and kitchen staff."}
+            <p className="text-xs sm:text-sm text-slate-400 mt-1.5">
+              {isUrdu
+                ? "اپنے ٹیبلز، کچن کیو اور آرڈرز کے انتظام کے لیے لاگ ان کریں"
+                : "Sign in to manage your tables, kitchen queue, and orders."}
             </p>
           </div>
 
-          {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-surface-dark/60 border border-white/5 mb-6 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode("password");
-                setError(null);
-              }}
-              className={`py-2 rounded-lg transition-all ${
-                authMode === "password"
-                  ? "bg-brand-500 text-white shadow-md shadow-brand-500/20"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Staff Password
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode("otp");
-                setError(null);
-              }}
-              className={`py-2 rounded-lg transition-all ${
-                authMode === "otp"
-                  ? "bg-brand-500 text-white shadow-md shadow-brand-500/20"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Phone OTP
-            </button>
-          </div>
-
-          {/* Error & Success Alerts */}
+          {/* Alerts */}
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="mb-4 p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
+              <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
               <span>{error}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <div className="mb-4 p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
               <span>{successMsg}</span>
             </div>
           )}
 
-          {/* Form 1: Password Login */}
-          {authMode === "password" && (
-            <form onSubmit={handlePasswordLogin} className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Email or Username
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="text"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="manager@mezflow.com"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-colors"
-                  />
-                </div>
+          {/* Clean SaaS Sign In Form */}
+          <form onSubmit={handleLogin} className="space-y-4 relative">
+            {/* Business Email */}
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                {isUrdu ? "ای میل ایڈریس" : "Business Email"}
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="manager@restaurant.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-surface-dark border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+                />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Password
+            {/* Password with Eye Toggle */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-medium text-slate-300">
+                  {isUrdu ? "پاس ورڈ" : "Password"}
                 </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                  <input
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-colors"
-                  />
-                </div>
               </div>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  autoComplete="current-password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-surface-dark border border-surface-border rounded-xl pl-10 pr-10 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors"
+                >
+                  {showPassword ? (
+                    <EyeOff className="w-4 h-4" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+            </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full mt-2 py-3 rounded-xl bg-gradient-to-r from-brand-500 to-amber-500 hover:from-brand-600 hover:to-amber-600 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-brand-500/25 transition-all disabled:opacity-50"
-              >
-                {loading ? (
+            {/* Remember Me */}
+            <div className="flex items-center justify-between text-xs pt-1">
+              <label className="flex items-center gap-2 cursor-pointer text-slate-400 hover:text-slate-300 select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-surface-border bg-surface-dark text-brand-500 focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5"
+                />
+                <span>{isUrdu ? "مجھے یاد رکھیں" : "Remember this device"}</span>
+              </label>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 bg-brand-500 hover:bg-brand-600 disabled:opacity-50 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-brand-500/25 active:scale-[0.99]"
+            >
+              {loading ? (
+                <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <span>Sign In</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
-
-          {/* Form 2: OTP Verification */}
-          {authMode === "otp" && (
-            <div className="space-y-4">
-              {!otpSent ? (
-                <form onSubmit={handleRequestOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                      Phone Number
-                    </label>
-                    <div className="relative">
-                      <Phone className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                      <input
-                        type="tel"
-                        required
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        placeholder="+92 300 1234567"
-                        className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-brand-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3 rounded-xl bg-brand-500 hover:bg-brand-600 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-brand-500/25 transition-all disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <span>Send 6-Digit OTP</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
+                  <span>
+                    {isUrdu ? "توثیق جاری ہے..." : "Authenticating..."}
+                  </span>
+                </>
               ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div>
-                    <div className="flex justify-between items-center mb-1.5">
-                      <label className="text-xs font-medium text-slate-300">
-                        Enter Verification Code
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setOtpSent(false)}
-                        className="text-[11px] text-brand-400 hover:underline"
-                      >
-                        Change Number
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
-                      <input
-                        type="text"
-                        required
-                        maxLength={6}
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value)}
-                        placeholder="123456"
-                        className="w-full bg-surface-card border border-surface-border rounded-xl pl-10 pr-4 py-2.5 text-sm tracking-widest text-center font-mono font-bold text-white placeholder-slate-600 focus:outline-none focus:border-brand-500 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <span>Verify & Proceed</span>
-                        <CheckCircle2 className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
-                </form>
+                <>
+                  <span>{isUrdu ? "سائن ان کریں" : "Sign In to Workspace"}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
               )}
+            </button>
+          </form>
+
+          {/* Saved Real Profiles on this device */}
+          {savedProfiles.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-surface-border">
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  {isUrdu ? "محفوظ شدہ پروفائلز" : "Saved Profiles on Device"}
+                </span>
+                <span className="text-[10px] text-emerald-400 font-bold flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>Real Accounts</span>
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                {savedProfiles.map((p, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectSavedProfile(p.email)}
+                    className="w-full flex items-center justify-between p-2 rounded-xl bg-surface-dark/70 hover:bg-surface-dark border border-surface-border/60 hover:border-brand-500/40 transition-all text-left group"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-brand-500/20 text-brand-400 font-black text-xs flex items-center justify-center shrink-0 group-hover:bg-brand-500 group-hover:text-white transition-colors">
+                        {p.displayName ? p.displayName[0].toUpperCase() : p.email[0].toUpperCase()}
+                      </div>
+                      <div className="truncate">
+                        <div className="text-xs font-bold text-white group-hover:text-brand-300 transition-colors truncate">
+                          {p.displayName || p.email}
+                        </div>
+                        <div className="text-[10px] text-slate-400 truncate">
+                          {p.email} • <span className="capitalize text-slate-300 font-medium">{p.role.replace("_", " ")}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
-          {/* Quick Role Switcher Bar */}
-          <div className="mt-8 pt-6 border-t border-white/5">
-            <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2 text-center">
-              Quick Role Switcher
-            </span>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => fillPreset("manager@mezflow.com", "manager123")}
-                className="p-2.5 rounded-xl bg-surface-card border border-surface-border hover:border-purple-500/50 text-left transition-all flex items-center gap-2.5 group"
-              >
-                <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-110 transition-transform">
-                  <LayoutDashboard className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="font-semibold text-white">Manager</div>
-                  <div className="text-[10px] text-slate-400">Admin Console</div>
-                </div>
-              </button>
+          {/* Bottom Security Info */}
+          <div className="mt-5 pt-3 border-t border-surface-border/60 flex items-center justify-center gap-1.5 text-[11px] text-slate-500">
+            <Lock className="w-3 h-3 text-slate-400" />
+            <span>{isUrdu ? "محفوظ تصدیق شدہ سائن ان" : "Secure multi-tenant workspace login"}</span>
+          </div>
 
-              <button
-                type="button"
-                onClick={() => fillPreset("kitchen@mezflow.com", "kitchen123")}
-                className="p-2.5 rounded-xl bg-surface-card border border-surface-border hover:border-blue-500/50 text-left transition-all flex items-center gap-2.5 group"
+          {/* Bottom Link to Register */}
+          <div className="text-center mt-4">
+            <p className="text-xs text-slate-400">
+              {isUrdu ? "نیا ریستورانٹ شروع کرنا چاہتے ہیں؟" : "New to MezFlow?"}{" "}
+              <Link
+                href="/signup"
+                className="text-brand-400 hover:text-brand-300 font-bold ml-1 transition-colors"
               >
-                <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
-                  <ChefHat className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="font-semibold text-white">Kitchen Chef</div>
-                  <div className="text-[10px] text-slate-400">KDS Display</div>
-                </div>
-              </button>
-            </div>
+                {isUrdu ? "یہاں رجسٹر کریں" : "Create a restaurant workspace →"}
+              </Link>
+            </p>
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="text-center text-xs text-slate-500 mt-6">
-        <span>MezFlow Hospitality Intelligence Platform © 2026 • Enterprise Real-Time Operations</span>
+      <footer className="text-center text-slate-500 text-[11px] py-4">
+        © {new Date().getFullYear()} MezFlow Hospitality Operations Platform • Multi-Tenant Enterprise Real-Time SaaS
       </footer>
     </div>
   );

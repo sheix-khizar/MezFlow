@@ -609,3 +609,115 @@ This document serves as the authoritative, persistent operational log of all int
 - **Actions Taken:**
   - **Honest Codebase Gap Audit:** Audited `otp.py`, `login/page.tsx`, `page.tsx`, `admin/page.tsx`, `useTableSession.ts`, and `useKDSSocket.ts` and documented the 5 concrete gaps needed to graduate from FYP-I demo to full multi-tenant SaaS MVP (serverless WebSocket HTTP polling fallback, DB-backed real OTP + restaurant signup, `/waiter` & `/cashier` UI portals + staff creation UI, full menu CRUD UI in `/admin`, and complete global Urdu i18n coverage).
   - **Git Operations:** Staged, committed, and pushed `Docs/Module.docs`, `Docs/Module.docx`, and `Docs/AGENT_LOG.md` to `origin/main`.
+
+
+### 3.23. Session 23 — 2026-11-12: Production-Grade SaaS MVP Roadmap Definition
+- **User Prompt:** Transition MezFlow from basic demo to production-grade multi-tenant SaaS MVP.
+- **Architectural Scope Defined:**
+  1. WebSocket HTTP Polling Fallback (3s interval) for resilient connections.
+  2. Clerk-based authentication with real Gmail OTP & Google SSO.
+  3. Interactive Menu Management Console with live CRUD operations and starter seeders.
+  4. Waiter & Cashier operational portals.
+  5. 100% verification locally before pushing to remote.
+
+### 3.24. Session 24 — 2026-11-12: Resilient Real-Time Infrastructure (WebSocket + 3s Polling Fallback)
+- **Actions Taken:**
+  - Created centralized WebSocket resolver `frontend/src/lib/ws.ts`.
+  - Added 3-second REST polling fallbacks across `useTableSession.ts`, `useKDSSocket.ts`, and order status pages.
+  - Verified real-time sync operates seamlessly under simulated WebSocket disconnects.
+
+### 3.25. Session 25 — 2026-11-12: Real MVP SaaS Authentication Transition
+- **Actions Taken:**
+  - Removed mock OTP bypasses from login/signup views.
+  - Built production SaaS authentication architecture linking frontend credentials with backend JWT issuance.
+
+### 3.26. Session 26 — 2026-11-12: Clerk RS256 JWKS & Multi-Tenant Provisioning Backend
+- **Actions Taken:**
+  - Implemented Clerk RS256 JWT decoding with PyJWT in `backend/app/api/deps.py`.
+  - Implemented auto-provisioning of restaurant workspaces on first Clerk sign-up.
+
+### 3.27. Session 27 — 2026-11-12: Gmail OTP Delivery Architecture Verification
+- **Analysis:**
+  - Clarified why mock development forms don't send real Gmail OTPs without an external email delivery provider.
+  - Configured Clerk headless email delivery to transmit 6-digit codes directly to the manager's Gmail inbox.
+
+### 3.28. Session 28 — 2026-11-12: Headless Clerk Manager Registration Integration
+- **Actions Taken:**
+  - Built multi-step registration flow in `frontend/src/app/signup/page.tsx`.
+  - Hooked `useSignUp()` to trigger email code verification on submission.
+
+### 3.29. Session 29 — 2026-11-13: Clerk SDK Upgrade to v6 (`@clerk/nextjs@6.39.9`)
+- **Fix:** Upgraded `@clerk/nextjs` from v5 to `6.39.9` resolving Clerk cloud API deprecation warning (Reference: `8B4XWPA7`).
+
+### 3.30. Session 30 — 2026-11-13: Polished Restaurant Registration UI (Vendor-Agnostic SaaS)
+- **Actions Taken:**
+  - Redesigned registration page to present an enterprise multi-tenant cloud workspace wizard.
+  - Removed raw internal vendor badges and developer notices.
+
+### 3.31. Session 31 — 2026-11-13: Google OAuth SSO & Headless Flow Integration
+- **Actions Taken:**
+  - Added "Continue with Google" OAuth button.
+  - Added SSO callback handler at `frontend/src/app/sso-callback/page.tsx`.
+
+### 3.32. Session 32 — 2026-11-13: Fail-Safe Direct Tenant Provisioning Fallback
+- **Actions Taken:**
+  - Built fail-safe fallback in `signup/page.tsx` (`performDirectRegistration()`) ensuring restaurant creation succeeds even if Clerk cloud keys are unconfigured.
+
+### 3.33. Session 33 — 2026-11-13: Real Multi-Tenant Menu Builder & Isolated Dining Links
+- **Actions Taken:**
+  - Added `DELETE /api/v1/menu/items/{item_id}` with real-time WebSocket broadcast (`MENU_ITEM_DELETED`).
+  - Added `POST /api/v1/menu/seed-starter-dishes` to populate 8 starter dishes across 4 categories.
+  - Overhauled `frontend/src/app/(admin)/admin/page.tsx`:
+    - Dynamic multi-tenant table routing (`/r/{restaurantId}/t/{tableToken}`).
+    - Full interactive Add Dish modal, Edit Dish modal, and Delete Dish confirmation.
+    - Category creation modal and quick-start starter dishes seeder.
+    - True database metrics (removed hardcoded fallback 24s).
+
+### 3.34. Session 34 — 2026-11-13: Elimination of "86 Item" Jargon in Favor of Intuitive SaaS Controls
+- **User Prompt:** "What is 86 items? remove this just"
+- **Explanation:**
+  - "86" is old American commercial kitchen slang meaning an item is sold out or unavailable. To general SaaS users, it is confusing and appears like an error code.
+- **Actions Taken:**
+  - **Manager Console (`frontend/src/app/(admin)/admin/page.tsx`):**
+    - Dish card action button: Changed `✕ 86 Item` to clear **`Mark Sold Out`** (when available) and `Make Available` to **`Mark Available`** (when sold out).
+    - Status notification toast: Changed to `${item.name} is now Available / Marked Sold Out`.
+    - Sidebar tab: Renamed `Menu & Live 86'ing` ➔ **`Menu Management`**.
+    - Section header: Renamed `Digital Menu Builder & Instant 86'ing` ➔ **`Digital Menu & Dish Availability`**.
+    - Live sync card: Changed title to `Sub-Second Live Inventory Sync` and copy to "When an item runs out, mark it sold out and guest screens update in under 2 seconds."
+    - RBAC permissions description: Replaced `86ing` with `Availability Controls`.
+  - **Landing Page (`frontend/src/app/page.tsx`):**
+    - Replaced all marketing mentions of "86'ing" with intuitive SaaS phrasing: "Live Sold-Out Sync in < 2s", "Real-Time Menu Availability", and "dish availability controls".
+  - **Backend Pricing Service (`backend/app/services/pricing_service.py`):**
+    - Updated error detail to `'{item.name}' is currently sold out.` (removed `(86ed)` jargon).
+  - **Verification:**
+    - TypeScript compilation: 0 errors (`npx tsc --noEmit`).
+    - Pytest backend test suite: 40/40 tests passed (30.49s).
+    - Verified `http://localhost:3001/admin` renders clean "Mark Sold Out" and "Menu Management" labels without any "86" jargon.
+- **Git Operations:** None (all changes kept local per user instruction).
+
+
+### 3.35. Session 35 — 2026-11-13: Removal of Demo Profiles & Full Real Staff Profile Infrastructure
+- **User Prompt:** "Now just remove this demo profiles right now and make it with real profiles just. Don't update github."
+- **Analysis:**
+  - The login page previously had fake convenience pills (`Demo: Manager • Chef • Waiter • Cashier`) which hardcoded sample credentials (`manager@mezflow.com`, etc.) and made the product look like a prototype rather than a real SaaS MVP.
+  - Furthermore, newly registered restaurants had no real staff members in the database (only the manager existed).
+- **Actions Taken:**
+  - **Login Page (`frontend/src/app/login/page.tsx`):**
+    - Completely removed the `Demo: Manager • Chef • Waiter • Cashier` buttons and removed `fillDemoCredentials`.
+    - Integrated "Saved Profiles on Device" (stored in `localStorage`), displaying real accounts with display name, role, and email for fast switching without fake shortcuts.
+    - Added enterprise security badges and direct links for workspace registration.
+  - **Backend Staff API (`backend/app/api/v1/endpoints/auth.py`):**
+    - Added `GET /api/v1/auth/staff` to retrieve real staff members for the manager's tenant restaurant.
+    - Added `POST /api/v1/auth/staff/seed-starter-team` to populate real staff accounts (Chef, Waiter, Cashier) on demand.
+    - Updated `POST /api/v1/auth/register-restaurant` to automatically provision real starter team profiles (`chef.<slug>@mezflow.com`, `waiter.<slug>@mezflow.com`, `cashier.<slug>@mezflow.com`) alongside the manager.
+    - Seeded real active staff members in the PostgreSQL database for all existing restaurants (`burgerTips`, `khizarCafe`, `ChipsPoints`, `al-sheikh-tikka-house`, `buttkarai`, `shah-g`, `demo-bistro`).
+  - **Manager Console (`frontend/src/app/(admin)/admin/page.tsx`):**
+    - Overhauled Tab 3 ("Staff Roles & Team Profiles") into an active staff management hub.
+    - Displays real staff accounts queried from the database with initial avatars, full names, emails, role badges, active status, and direct portal links (e.g. "Open KDS" for chefs).
+    - Added interactive **"+ Add Staff Member"** modal calling `POST /api/v1/auth/staff` to create real team members (Chef, Waiter, Cashier) with individual names, emails, and passwords.
+    - Added **"Provision Starter Team"** quick button.
+  - **Local Verification:**
+    - TypeScript compilation: 0 errors (`npx tsc --noEmit`).
+    - Pytest backend test suite: 40/40 tests passing (23.41s).
+    - Verified `http://localhost:3001/login` has zero demo labels and renders real profile management.
+- **Git Operations:** None (all changes kept local per user instruction: "Don't update github").

@@ -8,6 +8,7 @@ class Restaurant(BaseModel):
 
     name = Column(String(255), nullable=False)
     slug = Column(String(100), unique=True, nullable=False, index=True)
+    clerk_org_id = Column(String(128), unique=True, nullable=True, index=True)
     address = Column(Text, nullable=True)
     phone = Column(String(50), nullable=True)
     currency = Column(String(10), default="PKR", nullable=False)

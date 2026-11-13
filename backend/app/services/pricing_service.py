@@ -32,7 +32,7 @@ async def validate_and_compute_item_price(
     if not item.is_available:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"'{item.name}' is currently sold out (86ed).",
+            detail=f"'{item.name}' is currently sold out.",
         )
 
     base_price = Decimal(str(item.price))

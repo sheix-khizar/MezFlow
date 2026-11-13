@@ -22,6 +22,7 @@ interface StationFilterBarProps {
   summary: KDSSummary | null;
   soundEnabled: boolean;
   isConnected: boolean;
+  isPolling?: boolean;
   onSelectStation: (station: KitchenStation) => void;
   onSelectStatus: (status: KDSStatusFilter) => void;
   onToggleSound: () => void;
@@ -41,6 +42,7 @@ export function StationFilterBar({
   summary,
   soundEnabled,
   isConnected,
+  isPolling = false,
   onSelectStation,
   onSelectStatus,
   onToggleSound,
@@ -147,7 +149,13 @@ export function StationFilterBar({
           {/* Live Kitchen Status Indicator */}
           <div
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs"
-            title={isConnected ? "Kitchen Live Sync Active" : "Reconnecting..."}
+            title={
+              isConnected
+                ? "Kitchen Live WebSocket Connected"
+                : isPolling
+                ? "Fallback HTTP Auto-Sync Active (3s)"
+                : "Reconnecting..."
+            }
           >
             {isConnected ? (
               <>
@@ -156,11 +164,21 @@ export function StationFilterBar({
                   LIVE
                 </span>
               </>
+            ) : isPolling ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+                <span className="text-[11px] font-bold text-amber-400 hidden sm:inline">
+                  SYNC (3s)
+                </span>
+              </>
             ) : (
               <>
                 <WifiOff className="w-3.5 h-3.5 text-amber-400" />
                 <span className="text-[11px] font-bold text-amber-400 hidden sm:inline">
-                  RECONNECTING
+                  CONNECTING
                 </span>
               </>
             )}

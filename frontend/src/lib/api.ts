@@ -46,8 +46,16 @@ apiClient.interceptors.request.use(
         config.baseURL = PROD_BACKEND_URL;
       }
 
-      const token = localStorage.getItem("mezflow_token");
-      if (token && config.headers) {
+      let token = localStorage.getItem("mezflow_token");
+      if (!token && (window as any).Clerk?.session) {
+        try {
+          const clerkToken = (window as any).Clerk.session.lastActiveToken?.jwt;
+          if (clerkToken) token = clerkToken;
+        } catch {
+          // ignore
+        }
+      }
+      if (token && config.headers && !config.headers.Authorization) {
         config.headers.Authorization = `Bearer ${token}`;
       }
       const dinerId = localStorage.getItem("mezflow_diner_id");

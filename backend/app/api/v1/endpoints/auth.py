@@ -12,6 +12,10 @@ from app.core.security import get_password_hash, verify_password, create_access_
 from app.models.user import User, UserProfile, UserRole
 from app.models.audit import AuditLog
 from app.models.restaurant import Restaurant
+import re
+import secrets
+from app.models.table import Table, TableStatus
+from app.models.menu import MenuCategory, MenuItem
 from app.schemas.auth import (
     UserSignupRequest,
     StaffCreateRequest,
@@ -23,6 +27,8 @@ from app.schemas.auth import (
     UserProfileResponse,
     UserResponse,
     AuditLogResponse,
+    RestaurantRegisterRequest,
+    OnboardingRequest,
 )
 from app.services.otp import OTPService
 from app.services.audit import record_audit_log
@@ -217,6 +223,85 @@ async def create_staff(
     )
     res = await db.execute(stmt)
     return res.scalar_one()
+
+
+@router.get("/staff", response_model=List[UserResponse], tags=["Administration"])
+async def list_staff(
+    current_user: User = Depends(require_roles([UserRole.MANAGER])),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Returns all real staff members for the authenticated manager's restaurant workspace.
+    """
+    stmt = (
+        select(User)
+        .options(selectinload(User.profile))
+        .where(
+            User.restaurant_id == current_user.restaurant_id,
+            User.role.in_([UserRole.MANAGER, UserRole.KITCHEN_STAFF, UserRole.SERVICE_STAFF, UserRole.CASHIER]),
+        )
+        .order_by(User.created_at.asc())
+    )
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+
+@router.post("/staff/seed-starter-team", response_model=List[UserResponse], tags=["Administration"])
+async def seed_starter_team(
+    current_user: User = Depends(require_roles([UserRole.MANAGER])),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Provisions real starter team accounts (Chef, Waiter, Cashier) for the manager's restaurant workspace.
+    """
+    rest_res = await db.execute(select(Restaurant).where(Restaurant.id == current_user.restaurant_id))
+    rest = rest_res.scalar_one_or_none()
+    slug = rest.slug if rest else "workspace"
+    default_pass = get_password_hash("team1234")
+
+    starter_roles = [
+        (f"chef.{slug}@mezflow.com", f"{rest.name if rest else 'Kitchen'} Head Chef", UserRole.KITCHEN_STAFF),
+        (f"waiter.{slug}@mezflow.com", f"{rest.name if rest else 'Floor'} Captain", UserRole.SERVICE_STAFF),
+        (f"cashier.{slug}@mezflow.com", f"{rest.name if rest else 'Front'} Cashier", UserRole.CASHIER),
+    ]
+
+    for s_email, s_name, s_role in starter_roles:
+        existing = await db.execute(
+            select(User).where(User.restaurant_id == current_user.restaurant_id, User.email == s_email)
+        )
+        if not existing.scalar_one_or_none():
+            u = User(
+                restaurant_id=current_user.restaurant_id,
+                email=s_email,
+                hashed_password=current_user.hashed_password or default_pass,
+                role=s_role,
+                is_active=True,
+                is_verified=True,
+            )
+            db.add(u)
+            await db.flush()
+            p = UserProfile(
+                user_id=u.id,
+                display_name=s_name,
+                preferred_language="en",
+                push_notifications_enabled=True,
+            )
+            db.add(p)
+            await db.flush()
+
+    await db.commit()
+
+    stmt = (
+        select(User)
+        .options(selectinload(User.profile))
+        .where(
+            User.restaurant_id == current_user.restaurant_id,
+            User.role.in_([UserRole.MANAGER, UserRole.KITCHEN_STAFF, UserRole.SERVICE_STAFF, UserRole.CASHIER]),
+        )
+        .order_by(User.created_at.asc())
+    )
+    res = await db.execute(stmt)
+    return res.scalars().all()
 
 
 @router.post("/login", response_model=TokenResponse, tags=["Authentication"])
@@ -586,3 +671,349 @@ async def list_audit_logs(
     )
     result = await db.execute(stmt)
     return result.scalars().all()
+
+
+@router.post(
+    "/register-restaurant",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["Authentication", "Multi-Tenancy"],
+    summary="Register a brand-new restaurant workspace with Manager credentials",
+)
+async def register_restaurant(
+    data: RestaurantRegisterRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Provisions a new isolated multi-tenant restaurant workspace in PostgreSQL:
+    - Creates Restaurant record with unique URL slug.
+    - Creates Manager User account with secure bcrypt hashed password.
+    - Seeds 10 starter dining tables with QR code tokens.
+    - Seeds starter menu categories.
+    - Issues an authenticated JWT session token.
+    (FR-M1-01, FR-M1-05, Multi-Tenancy)
+    """
+    clean_email = data.email.strip().lower()
+
+    if not data.password and not data.clerk_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either password or verified Clerk user ID must be provided.",
+        )
+
+    # 1. Check if user or clerk_user_id already registered
+    existing_user_stmt = select(User).options(selectinload(User.restaurant), selectinload(User.profile)).where(
+        or_(
+            User.email == clean_email,
+            User.clerk_user_id == data.clerk_user_id if data.clerk_user_id else False,
+        )
+    )
+    existing_user_res = await db.execute(existing_user_stmt)
+    existing_user = existing_user_res.scalar_one_or_none()
+
+    if existing_user and existing_user.restaurant_id:
+        # If user is already registered via Clerk and has a restaurant, return token directly
+        token = create_access_token(
+            subject=str(existing_user.id),
+            claims={
+                "role": existing_user.role.value,
+                "restaurant_id": str(existing_user.restaurant_id),
+            },
+        )
+        return TokenResponse(
+            access_token=token,
+            token_type="bearer",
+            role=existing_user.role.value,
+            restaurant_id=existing_user.restaurant_id,
+            user_id=existing_user.id,
+            display_name=existing_user.profile.display_name if existing_user.profile else data.manager_name,
+            preferred_language=existing_user.profile.preferred_language if existing_user.profile else "en",
+        )
+
+    # 2. Derive unique restaurant slug
+    base_slug = re.sub(r"[^a-z0-9]+", "-", data.restaurant_name.strip().lower()).strip("-")
+    if not base_slug:
+        base_slug = "restaurant"
+    candidate_slug = base_slug
+    suffix = 1
+    while True:
+        existing_slug = await db.execute(select(Restaurant).where(Restaurant.slug == candidate_slug))
+        if not existing_slug.scalar_one_or_none():
+            break
+        suffix += 1
+        candidate_slug = f"{base_slug}-{suffix}"
+
+    # 3. Create Restaurant
+    clerk_org_id = data.clerk_org_id or (f"org_{data.clerk_user_id[-8:]}" if data.clerk_user_id else None)
+    restaurant = Restaurant(
+        name=data.restaurant_name.strip(),
+        slug=candidate_slug,
+        address=data.address,
+        phone=data.phone,
+        currency=data.currency.upper(),
+        clerk_org_id=clerk_org_id,
+        is_active=True,
+    )
+    db.add(restaurant)
+    await db.flush()
+
+    # 4. Create or link Manager User
+    hashed_pwd = get_password_hash(data.password) if data.password else get_password_hash(secrets.token_urlsafe(32))
+    if existing_user:
+        existing_user.restaurant_id = restaurant.id
+        existing_user.role = UserRole.MANAGER
+        if data.clerk_user_id and not existing_user.clerk_user_id:
+            existing_user.clerk_user_id = data.clerk_user_id
+        manager_user = existing_user
+    else:
+        manager_user = User(
+            restaurant_id=restaurant.id,
+            email=clean_email,
+            phone_number=data.phone,
+            hashed_password=hashed_pwd,
+            clerk_user_id=data.clerk_user_id,
+            role=UserRole.MANAGER,
+            is_active=True,
+            is_verified=True,
+        )
+        db.add(manager_user)
+        await db.flush()
+
+        profile = UserProfile(
+            user_id=manager_user.id,
+            display_name=data.manager_name.strip(),
+            preferred_language="en",
+            push_notifications_enabled=True,
+        )
+        db.add(profile)
+    await db.flush()
+
+    # 4b. Seed Real Starter Team Profiles for this restaurant
+    starter_team = [
+        (f"chef.{candidate_slug}@mezflow.com", f"{data.restaurant_name.strip()} Head Chef", UserRole.KITCHEN_STAFF),
+        (f"waiter.{candidate_slug}@mezflow.com", f"{data.restaurant_name.strip()} Floor Captain", UserRole.SERVICE_STAFF),
+        (f"cashier.{candidate_slug}@mezflow.com", f"{data.restaurant_name.strip()} Cashier Station", UserRole.CASHIER),
+    ]
+    for s_email, s_name, s_role in starter_team:
+        s_user = User(
+            restaurant_id=restaurant.id,
+            email=s_email,
+            hashed_password=hashed_pwd,
+            role=s_role,
+            is_active=True,
+            is_verified=True,
+        )
+        db.add(s_user)
+        await db.flush()
+        db.add(
+            UserProfile(
+                user_id=s_user.id,
+                display_name=s_name,
+                preferred_language="en",
+                push_notifications_enabled=True,
+            )
+        )
+    await db.flush()
+
+    # 5. Seed 10 starter dining tables with QR code tokens
+    for t_num in range(1, 11):
+        db.add(
+            Table(
+                restaurant_id=restaurant.id,
+                table_number=t_num,
+                capacity=4,
+                status=TableStatus.AVAILABLE,
+                qr_code_token=f"QR-{candidate_slug}-T{t_num}-{secrets.token_hex(3).upper()}",
+            )
+        )
+
+    # 6. Seed starter menu categories and initial dishes
+    cat_objs = []
+    categories = [
+        ("Starters & Appetizers", 1),
+        ("Main Course", 2),
+        ("Beverages & Drinks", 3),
+        ("Desserts", 4),
+    ]
+    for cat_name, order in categories:
+        c_obj = MenuCategory(restaurant_id=restaurant.id, name=cat_name, sort_order=order)
+        db.add(c_obj)
+        cat_objs.append(c_obj)
+    await db.flush()
+
+    # Seed starter dishes
+    initial_dishes = [
+        {
+            "category_id": cat_objs[0].id,
+            "name": "Crispy Mozzarella Sticks",
+            "name_ur": "کرسپی موزریلا سٹکس",
+            "description": "Golden crumbed mozzarella cheese with spicy marinara dipping sauce.",
+            "description_ur": "موزریلا پنیر اور مسالہ دار ساس۔",
+            "price": 650.00,
+            "kitchen_station": "fryer",
+            "expected_prep_minutes": 10,
+            "dietary_tags": ["vegetarian", "halal"],
+            "image_url": "https://images.unsplash.com/photo-1548340748-6d2b7d7da280?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": cat_objs[0].id,
+            "name": "Dynamite Buffalo Wings",
+            "name_ur": "ڈائنامائٹ بفیلو ونگز",
+            "description": "Crispy fried chicken wings tossed in tangy buffalo glaze with ranch.",
+            "description_ur": "کرسپی چکن ونگز اور بفیلو ساس۔",
+            "price": 850.00,
+            "kitchen_station": "fryer",
+            "expected_prep_minutes": 12,
+            "dietary_tags": ["halal"],
+            "image_url": "https://images.unsplash.com/photo-1567620832903-9fc6debc209f?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": cat_objs[1].id,
+            "name": "Royal Chicken Karahi",
+            "name_ur": "شاہی چکن کڑاہی",
+            "description": "Tender chicken cooked with fresh tomatoes, ginger, and roasted spices in a traditional wok.",
+            "description_ur": "روایتی کڑاہی میں تیار شدہ تازہ چکن اور مسالے۔",
+            "price": 1650.00,
+            "kitchen_station": "hot_kitchen",
+            "expected_prep_minutes": 20,
+            "dietary_tags": ["halal", "spicy"],
+            "image_url": "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": cat_objs[1].id,
+            "name": "Gourmet Angus Beef Burger",
+            "name_ur": "گورمے بیف برگر",
+            "description": "Juicy grilled beef patty with aged cheddar, caramelized onions, and secret sauce on brioche.",
+            "description_ur": "گرلڈ بیف پیٹی اور چیڈر پنیر برگر۔",
+            "price": 1250.00,
+            "kitchen_station": "grill",
+            "expected_prep_minutes": 15,
+            "dietary_tags": ["halal"],
+            "image_url": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": cat_objs[2].id,
+            "name": "Fresh Mint Lemonade",
+            "name_ur": "تازہ پودینہ لیمونیڈ",
+            "description": "Crushed mint leaves, fresh lime juice, black salt, and sparkling soda.",
+            "description_ur": "پودینہ، لیموں کا رس اور سوڈا۔",
+            "price": 350.00,
+            "kitchen_station": "drinks",
+            "expected_prep_minutes": 5,
+            "dietary_tags": ["vegetarian", "halal"],
+            "image_url": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": cat_objs[2].id,
+            "name": "Traditional Karak Chai",
+            "name_ur": "روایتی کڑک چائے",
+            "description": "Slowly brewed black tea leaves with evaporated milk and crushed cardamom.",
+            "description_ur": "دودھ پتی کڑک چائے الائچی کے ساتھ۔",
+            "price": 180.00,
+            "kitchen_station": "drinks",
+            "expected_prep_minutes": 6,
+            "dietary_tags": ["halal"],
+            "image_url": "https://images.unsplash.com/photo-1571934811356-5cc061b6821f?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": cat_objs[3].id,
+            "name": "Warm Chocolate Lava Cake",
+            "name_ur": "گرم چاکلیٹ لاوا کیک",
+            "description": "Decadent dark chocolate molten cake with a scoop of artisanal vanilla ice cream.",
+            "description_ur": "گرم چاکلیٹ کیک اور ونیلا آئس کریم۔",
+            "price": 750.00,
+            "kitchen_station": "dessert",
+            "expected_prep_minutes": 10,
+            "dietary_tags": ["vegetarian", "halal"],
+            "image_url": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=600&q=80",
+        },
+        {
+            "category_id": cat_objs[3].id,
+            "name": "Authentic Warm Gulab Jamun",
+            "name_ur": "خالص گرم گلاب جامن",
+            "description": "Tender milk-solid dumplings soaked in rose and cardamom saffron syrup.",
+            "description_ur": "زعفرانی شیرے میں ڈوبے ہوئے گلاب جامن۔",
+            "price": 450.00,
+            "kitchen_station": "dessert",
+            "expected_prep_minutes": 5,
+            "dietary_tags": ["vegetarian", "halal"],
+            "image_url": "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=600&q=80",
+        },
+    ]
+    for d_item in initial_dishes:
+        db.add(MenuItem(restaurant_id=restaurant.id, **d_item))
+
+    # 7. Record immutable audit log
+    ip = _get_client_ip(request)
+    await record_audit_log(
+        db=db,
+        restaurant_id=restaurant.id,
+        user_id=manager_user.id,
+        action="RESTAURANT_REGISTERED",
+        resource_type="restaurant",
+        resource_id=str(restaurant.id),
+        details={"restaurant_name": restaurant.name, "slug": restaurant.slug, "email": clean_email},
+        ip_address=ip,
+    )
+
+    await db.commit()
+
+    # 8. Issue authenticated session token
+    token = create_access_token(
+        subject=str(manager_user.id),
+        claims={
+            "role": manager_user.role.value,
+            "restaurant_id": str(restaurant.id),
+        },
+    )
+
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        role=manager_user.role.value,
+        restaurant_id=restaurant.id,
+        user_id=manager_user.id,
+        display_name=profile.display_name,
+        preferred_language=profile.preferred_language,
+    )
+
+
+@router.post(
+    "/onboarding",
+    tags=["Authentication", "Multi-Tenancy"],
+    summary="Update restaurant profile and manager preferences during onboarding",
+)
+async def update_onboarding(
+    data: OnboardingRequest,
+    current_user: User = Depends(require_roles([UserRole.MANAGER])),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Allows a newly registered or Clerk-authenticated Manager to customize
+    their restaurant details (name, address, phone, currency) and display name.
+    """
+    rest_stmt = select(Restaurant).where(Restaurant.id == current_user.restaurant_id)
+    restaurant = (await db.execute(rest_stmt)).scalar_one_or_none()
+    if not restaurant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Restaurant not found.")
+
+    if data.restaurant_name:
+        restaurant.name = data.restaurant_name.strip()
+    if data.address is not None:
+        restaurant.address = data.address.strip()
+    if data.phone is not None:
+        restaurant.phone = data.phone.strip()
+    if data.currency:
+        restaurant.currency = data.currency.upper().strip()
+
+    if data.display_name and current_user.profile:
+        current_user.profile.display_name = data.display_name.strip()
+
+    await db.commit()
+    return {
+        "message": "Restaurant onboarding details saved successfully.",
+        "restaurant_id": str(restaurant.id),
+        "restaurant_name": restaurant.name,
+        "currency": restaurant.currency,
+    }

@@ -1,5 +1,5 @@
 import os
-from typing import List, Union
+from typing import List, Union, Optional
 from pydantic import AnyHttpUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "temporary-dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+
+    # Clerk Multi-Tenant Authentication (Optional)
+    CLERK_SECRET_KEY: Optional[str] = None
+    CLERK_PUBLISHABLE_KEY: Optional[str] = None
+    CLERK_JWKS_URL: Optional[str] = None
+    CLERK_ISSUER: Optional[str] = None
 
     # PostgreSQL Database
     POSTGRES_SERVER: str = "localhost"

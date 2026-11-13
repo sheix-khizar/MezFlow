@@ -44,7 +44,7 @@ export default function KDSPage() {
     updateItemStatus,
   } = useKDSStore();
 
-  const { isConnected, reconnect } = useKDSSocket(restaurantId);
+  const { isConnected, isPolling, reconnect } = useKDSSocket(restaurantId);
 
   // Ensure kitchen authentication for wall-mounted tablet or direct browser access
   useEffect(() => {
@@ -80,17 +80,10 @@ export default function KDSPage() {
     ensureAuth();
   }, [setAuth, fetchActiveOrders, fetchSummary]);
 
-  // Initial fetch & polling fallback (every 30s)
+  // Initial fetch on mount (continuous fast auto-sync is handled by useKDSSocket)
   useEffect(() => {
     fetchActiveOrders();
     fetchSummary();
-
-    const interval = setInterval(() => {
-      fetchActiveOrders();
-      fetchSummary();
-    }, 30000);
-
-    return () => clearInterval(interval);
   }, [fetchActiveOrders, fetchSummary]);
 
   // Recall toast countdown effect
@@ -122,6 +115,7 @@ export default function KDSPage() {
         summary={summary}
         soundEnabled={soundEnabled}
         isConnected={isConnected}
+        isPolling={isPolling}
         onSelectStation={setSelectedStation}
         onSelectStatus={setStatusFilter}
         onToggleSound={toggleSound}

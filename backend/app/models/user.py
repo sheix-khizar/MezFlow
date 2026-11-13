@@ -17,6 +17,7 @@ class User(BaseModel):
     __tablename__ = "users"
 
     restaurant_id = Column(UUID(as_uuid=True), ForeignKey("restaurants.id", ondelete="CASCADE"), nullable=False, index=True)
+    clerk_user_id = Column(String(128), unique=True, nullable=True, index=True)
     email = Column(String(255), nullable=True, index=True)
     phone_number = Column(String(50), nullable=True, index=True)
     hashed_password = Column(String(255), nullable=True)

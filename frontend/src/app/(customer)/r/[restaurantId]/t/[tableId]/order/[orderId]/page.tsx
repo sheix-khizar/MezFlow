@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import apiClient from "@/lib/api";
+import { getWebSocketBaseUrl } from "@/lib/ws";
 import { useAuthStore } from "@/lib/authStore";
 import { Order, OrderStatus } from "@/types/menu";
 import {
@@ -80,44 +81,64 @@ export default function OrderTrackingPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch initial order details
-  const fetchOrder = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await apiClient.get<Order>(`/orders/${orderId}`);
-      setOrder(res.data);
-    } catch (err: any) {
-      setError(err.message || "Failed to load order details");
-    } finally {
-      setLoading(false);
-    }
-  }, [orderId]);
+  // Fetch order details (silent = false on initial mount, silent = true for polling)
+  const fetchOrder = useCallback(
+    async (isInitial = false) => {
+      try {
+        if (isInitial) {
+          setLoading(true);
+          setError(null);
+        }
+        const res = await apiClient.get<Order>(`/orders/${orderId}`);
+        setOrder(res.data);
+      } catch (err: any) {
+        if (isInitial) {
+          setError(err.message || "Failed to load order details");
+        }
+      } finally {
+        if (isInitial) {
+          setLoading(false);
+        }
+      }
+    },
+    [orderId]
+  );
 
   useEffect(() => {
-    fetchOrder();
+    fetchOrder(true);
   }, [fetchOrder]);
 
-  // Connect WebSocket to table session to receive live ORDER_STATUS_CHANGED events
+  // Connect WebSocket to table session with automatic 3s REST polling fallback
   useEffect(() => {
     if (!order?.session_id || typeof window === "undefined") return;
 
     const sessionId = order.session_id;
-    const isHttps = window.location.protocol === "https:";
-    const defaultHost =
-      window.location.hostname === "localhost"
-        ? "localhost:8000"
-        : window.location.host;
-    const wsBase =
-      process.env.NEXT_PUBLIC_WS_URL || `${isHttps ? "wss" : "ws"}://${defaultHost}`;
+    const wsBase = getWebSocketBaseUrl();
 
     let ws: WebSocket | null = null;
     let pingInterval: NodeJS.Timeout | null = null;
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    const startPollingFallback = () => {
+      if (!pollInterval) {
+        pollInterval = setInterval(() => {
+          fetchOrder(false);
+        }, 3000);
+      }
+    };
+
+    const stopPollingFallback = () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
+    };
 
     try {
       ws = new WebSocket(`${wsBase}/ws/sessions/${sessionId}`);
 
       ws.onopen = () => {
+        stopPollingFallback();
         pingInterval = setInterval(() => {
           if (ws?.readyState === WebSocket.OPEN) {
             ws.send("ping");
@@ -138,15 +159,26 @@ export default function OrderTrackingPage() {
           // ignore
         }
       };
-    } catch (e) {
-      // WS fallback
+
+      ws.onclose = () => {
+        startPollingFallback();
+        if (pingInterval) clearInterval(pingInterval);
+      };
+
+      ws.onerror = () => {
+        startPollingFallback();
+        if (ws) ws.close();
+      };
+    } catch {
+      startPollingFallback();
     }
 
     return () => {
+      stopPollingFallback();
       if (pingInterval) clearInterval(pingInterval);
       if (ws) ws.close();
     };
-  }, [order?.session_id, orderId]);
+  }, [order?.session_id, orderId, fetchOrder]);
 
   if (loading) {
     return (

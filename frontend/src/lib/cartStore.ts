@@ -47,7 +47,7 @@ interface CartStoreState {
     displayName: string,
     avatarColor?: string
   ) => Promise<TableSession>;
-  fetchCart: (sessionId: string, dinerId?: string) => Promise<CartResponse>;
+  fetchCart: (sessionId: string, dinerId?: string, silent?: boolean) => Promise<CartResponse>;
   addItem: (
     sessionId: string,
     dinerId: string,
@@ -194,7 +194,7 @@ export const useCartStore = create<CartStoreState>((set, get) => ({
     }
   },
 
-  fetchCart: async (sessionId, dinerId) => {
+  fetchCart: async (sessionId, dinerId, silent = false) => {
     try {
       const headers = dinerId ? { "X-Diner-ID": dinerId } : undefined;
       const res = await apiClient.get<CartResponse>(
@@ -207,7 +207,9 @@ export const useCartStore = create<CartStoreState>((set, get) => ({
       });
       return res.data;
     } catch (err: any) {
-      console.error("fetchCart error:", err);
+      if (!silent) {
+        console.error("fetchCart error:", err);
+      }
       throw err;
     }
   },

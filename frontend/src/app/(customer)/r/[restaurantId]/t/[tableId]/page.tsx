@@ -182,9 +182,22 @@ export default function CustomerTablePage() {
     }
   }, []);
 
+  const refreshMenu = useCallback(async () => {
+    if (!tableInfo?.restaurant_id) return;
+    try {
+      const menuRes = await apiClient.get<PublicMenuResponse>(
+        `/restaurants/${tableInfo.restaurant_id}/menu?lang=${language}`
+      );
+      setMenu(menuRes.data);
+    } catch {
+      // Quiet background sync
+    }
+  }, [tableInfo?.restaurant_id, language]);
+
   const { isConnected: isMenuConnected } = useMenuRealtime(
     tableInfo?.restaurant_id,
-    handleRealtimeMenuEvent
+    handleRealtimeMenuEvent,
+    refreshMenu
   );
 
   // Real-time Collaborative Session WebSocket hook (< 2s sync)

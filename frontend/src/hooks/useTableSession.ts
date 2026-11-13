@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useCartStore } from "@/lib/cartStore";
+import { getWebSocketBaseUrl } from "@/lib/ws";
+import apiClient from "@/lib/api";
 
 export interface SessionRealtimeEvent {
   event:
@@ -36,14 +38,33 @@ export function useTableSession(
   onOrderSubmitted?: (evt: SessionRealtimeEvent) => void
 ) {
   const [isConnected, setIsConnected] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
   const [lastEvent, setLastEvent] = useState<SessionRealtimeEvent | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isPollingBusyRef = useRef(false);
   const retryCountRef = useRef(0);
+  const knownOrderIdsRef = useRef<Set<string>>(new Set());
 
   const { fetchCart, addOrUpdateDiner, notify, setCart } = useCartStore();
+
+  // Seed existing orders on session load so pre-existing orders don't re-trigger notification
+  useEffect(() => {
+    if (!sessionId) return;
+    apiClient
+      .get<any[]>(`/sessions/${sessionId}/orders`)
+      .then((res) => {
+        if (Array.isArray(res.data)) {
+          res.data.forEach((o) => {
+            if (o?.id) knownOrderIdsRef.current.add(o.id);
+          });
+        }
+      })
+      .catch(() => {});
+  }, [sessionId]);
 
   const handleMessage = useCallback(
     (evt: MessageEvent) => {
@@ -55,7 +76,6 @@ export function useTableSession(
 
         switch (data.event) {
           case "CONNECTED":
-            // Connected successfully
             break;
 
           case "DINER_JOINED":
@@ -78,8 +98,7 @@ export function useTableSession(
 
           case "CART_UPDATED":
             if (sessionId) {
-              // Fetch authoritative cart
-              fetchCart(sessionId, dinerId).catch(() => {});
+              fetchCart(sessionId, dinerId, true).catch(() => {});
             }
             if (data.actor_diner_name) {
               const actionText =
@@ -94,7 +113,7 @@ export function useTableSession(
 
           case "CART_CLEARED":
             if (sessionId) {
-              fetchCart(sessionId, dinerId).catch(() => {});
+              fetchCart(sessionId, dinerId, true).catch(() => {});
             }
             if (data.actor_diner_name) {
               notify(`${data.actor_diner_name} cleared the cart`, "info");
@@ -102,7 +121,9 @@ export function useTableSession(
             break;
 
           case "ORDER_SUBMITTED":
-            // Update cart to empty
+            if (data.order_id) {
+              knownOrderIdsRef.current.add(data.order_id);
+            }
             setCart(null);
             notify(
               `Order ${data.display_number || ""} submitted by ${
@@ -132,18 +153,68 @@ export function useTableSession(
     [sessionId, dinerId, fetchCart, addOrUpdateDiner, notify, setCart, onOrderSubmitted]
   );
 
+  // Active HTTP Polling Fallback (Runs when WebSocket is disconnected or on serverless)
+  const pollFallbackTick = useCallback(async () => {
+    if (!sessionId || isPollingBusyRef.current) return;
+    isPollingBusyRef.current = true;
+    try {
+      // 1. Authoritative Cart sync
+      await fetchCart(sessionId, dinerId, true);
+
+      // 2. Discover newly submitted orders by peers
+      const res = await apiClient.get<any[]>(`/sessions/${sessionId}/orders`);
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        for (const ord of res.data) {
+          if (ord?.id && !knownOrderIdsRef.current.has(ord.id)) {
+            knownOrderIdsRef.current.add(ord.id);
+            setCart(null);
+            notify(
+              `Order ${ord.display_number || ""} submitted by ${
+                ord.placed_by_diner_name || "a diner"
+              }! 🚀`,
+              "success"
+            );
+            if (onOrderSubmitted) {
+              onOrderSubmitted({
+                event: "ORDER_SUBMITTED",
+                session_id: sessionId,
+                order_id: ord.id,
+                display_number: ord.display_number,
+                order_number: ord.order_number,
+                placed_by: ord.placed_by_diner_name,
+              });
+            }
+          }
+        }
+      }
+    } catch {
+      // Quiet background polling fallback
+    } finally {
+      isPollingBusyRef.current = false;
+    }
+  }, [sessionId, dinerId, fetchCart, notify, setCart, onOrderSubmitted]);
+
+  const startPolling = useCallback(() => {
+    setIsPolling(true);
+    if (!pollIntervalRef.current) {
+      // Run immediate tick then every 3000ms
+      pollFallbackTick();
+      pollIntervalRef.current = setInterval(pollFallbackTick, 3000);
+    }
+  }, [pollFallbackTick]);
+
+  const stopPolling = useCallback(() => {
+    setIsPolling(false);
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
+  }, []);
+
   const connect = useCallback(() => {
     if (!sessionId || typeof window === "undefined") return;
 
-    const isHttps = window.location.protocol === "https:";
-    const host =
-      window.location.hostname === "localhost"
-        ? "127.0.0.1"
-        : window.location.hostname;
-    const defaultHost = `${host}:8000`;
-    const wsBase =
-      process.env.NEXT_PUBLIC_WS_URL || `${isHttps ? "wss" : "ws"}://${defaultHost}`;
-
+    const wsBase = getWebSocketBaseUrl();
     const queryParams = new URLSearchParams();
     if (dinerId) queryParams.set("diner_id", dinerId);
 
@@ -155,6 +226,7 @@ export function useTableSession(
 
       ws.onopen = () => {
         setIsConnected(true);
+        stopPolling();
         retryCountRef.current = 0;
 
         // Keep-alive heartbeat ping every 25 seconds
@@ -169,6 +241,7 @@ export function useTableSession(
 
       ws.onclose = () => {
         setIsConnected(false);
+        startPolling();
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
 
         // Exponential backoff reconnect
@@ -186,6 +259,8 @@ export function useTableSession(
         ws.close();
       };
     } catch {
+      setIsConnected(false);
+      startPolling();
       const backoffMs = Math.min(
         1000 * Math.pow(2, retryCountRef.current),
         10000
@@ -195,22 +270,24 @@ export function useTableSession(
         connect();
       }, backoffMs);
     }
-  }, [sessionId, dinerId, handleMessage]);
+  }, [sessionId, dinerId, handleMessage, startPolling, stopPolling]);
 
   useEffect(() => {
     connect();
 
     return () => {
+      stopPolling();
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (wsRef.current) {
         wsRef.current.close();
       }
     };
-  }, [connect]);
+  }, [connect, stopPolling]);
 
   return {
     isConnected,
+    isPolling,
     lastEvent,
     reconnect: connect,
   };

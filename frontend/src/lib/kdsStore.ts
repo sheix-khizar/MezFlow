@@ -34,7 +34,7 @@ interface KDSState {
   clearRecallToast: () => void;
 
   // Async API calls
-  fetchActiveOrders: () => Promise<void>;
+  fetchActiveOrders: (silent?: boolean) => Promise<void>;
   fetchSummary: () => Promise<void>;
   bumpOrder: (orderId: string, targetStatus?: string) => Promise<void>;
   recallOrder: (orderId: string, reason?: string) => Promise<void>;
@@ -76,10 +76,10 @@ export const useKDSStore = create<KDSState>((set, get) => ({
 
   clearRecallToast: () => set({ recallToast: null }),
 
-  fetchActiveOrders: async () => {
+  fetchActiveOrders: async (silent = false) => {
     const { selectedStation, statusFilter } = get();
     try {
-      set({ isLoading: true, error: null });
+      if (!silent) set({ isLoading: true, error: null });
       const res = await apiClient.get<KDSOrderCard[]>("/kds/orders/active", {
         params: {
           station: selectedStation,
@@ -88,10 +88,12 @@ export const useKDSStore = create<KDSState>((set, get) => ({
       });
       set({ orders: res.data, isLoading: false });
     } catch (err: any) {
-      set({
-        isLoading: false,
-        error: err.message || "Failed to load active kitchen queue",
-      });
+      if (!silent) {
+        set({
+          isLoading: false,
+          error: err.message || "Failed to load active kitchen queue",
+        });
+      }
     }
   },
 

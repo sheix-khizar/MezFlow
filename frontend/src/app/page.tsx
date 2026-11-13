@@ -98,16 +98,16 @@ export default function HomePage() {
               className="hidden sm:inline-flex items-center gap-2 px-4 py-2.5 rounded-xl glass-panel hover:bg-white/10 text-slate-200 text-xs font-bold border border-white/10 hover:border-brand-500/40 transition-all shadow-sm"
             >
               <LogIn className="w-3.5 h-3.5 text-brand-400" />
-              <span>Staff Login</span>
+              <span>Sign In</span>
             </Link>
 
-            <a
-              href="#live-demo"
+            <Link
+              href="/signup"
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-brand-600 to-amber-500 hover:from-brand-500 hover:to-amber-400 text-white text-xs font-extrabold shadow-lg shadow-brand-500/20 active:scale-95 transition-all"
             >
-              <span>Explore Demo</span>
+              <span>Get Started</span>
               <ArrowRight className="w-3.5 h-3.5" />
-            </a>
+            </Link>
           </div>
         </div>
       </header>
@@ -529,7 +529,7 @@ export default function HomePage() {
                 </h3>
                 <p className="text-slate-300 text-sm leading-relaxed">
                   Empower general managers with an interactive floor occupancy map, real-time
-                  menu 86&apos;ing, print-ready acrylic QR stands, and role-based staff management.
+                  dish availability controls, print-ready acrylic QR stands, and role-based staff management.
                 </p>
 
                 <div className="space-y-3 text-xs text-slate-300">
@@ -539,7 +539,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Instant 86&apos;ing toggles that remove sold-out dishes from diners in &lt;2s</span>
+                    <span>Real-time availability toggles that update sold-out dishes for diners in &lt;2s</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -583,7 +583,7 @@ export default function HomePage() {
                   ))}
                 </div>
                 <div className="pt-2 flex justify-between items-center text-xs border-t border-surface-border">
-                  <span className="text-slate-400">Live 86&apos;ing Control</span>
+                  <span className="text-slate-400">Live Availability Control</span>
                   <span className="text-emerald-400 font-bold">16 / 16 Dishes Available</span>
                 </div>
               </div>
@@ -719,10 +719,10 @@ export default function HomePage() {
                 <Radio className="w-5 h-5" />
               </div>
               <h4 className="text-base font-extrabold text-white">
-                Live 86&apos;ing in &lt; 2s
+                Live Sold-Out Sync in &lt; 2s
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                Ran out of steaks or karahi? 1-tap in the Manager portal instantly marks the dish sold out across every customer phone without page reloads.
+                Ran out of steaks or burgers? 1-tap in the Manager portal instantly marks the dish sold out across every customer phone without page reloads.
               </p>
             </div>
 
@@ -819,7 +819,7 @@ export default function HomePage() {
                     Operations Center
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
-                    Floor visualizer, 86&apos;ing & QR print stands.
+                    Floor visualizer, menu controls & QR print stands.
                   </p>
                 </Link>
               </div>
@@ -876,7 +876,7 @@ export default function HomePage() {
                 <span className="text-slate-400 block">Contactless Mobile Ordering</span>
                 <span className="text-slate-400 block">Collaborative Group Cart</span>
                 <span className="text-slate-400 block">Multi-Station Kitchen Routing</span>
-                <span className="text-slate-400 block">Real-Time Menu 86&apos;ing</span>
+                <span className="text-slate-400 block">Real-Time Menu Availability</span>
                 <span className="text-slate-400 block">Live Floor Plan & Occupancy</span>
               </div>
 

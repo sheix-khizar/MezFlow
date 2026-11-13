@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
+import { ClerkProvider } from "@clerk/nextjs";
 import "../styles/globals.css";
 
 const inter = Inter({
@@ -27,16 +28,28 @@ export const viewport: Viewport = {
   themeColor: "#0b0f17",
 };
 
+const clerkPublishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return (
+  const content = (
     <html lang="en" className={inter.variable}>
       <body className="font-sans antialiased bg-surface-dark text-slate-100 selection:bg-brand-500 selection:text-white">
         {children}
       </body>
     </html>
   );
+
+  if (clerkPublishableKey) {
+    return (
+      <ClerkProvider publishableKey={clerkPublishableKey}>
+        {content}
+      </ClerkProvider>
+    );
+  }
+
+  return content;
 }
